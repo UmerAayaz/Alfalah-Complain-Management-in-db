@@ -318,3 +318,104 @@ npm run dev
     configuration.
 -   The assigned officer's recipient email should be fetched from the
     database rather than hardcoded.
+    ////////////////////////////////////////////////
+
+
+
+
+    . Migration apply karo — YE MAIN COMMAND HAI
+powershell
+cd C:\Projects\Alfalah-Complain-Management
+powershell
+dotnet ef database update --project .\src\BankingPlatform.Infrastructure --startup-project .\src\BankingPlatform.Api
+Kya hota hai:
+
+Saari migrations (Initial + Dynamic Fields + Labels + Attachments + Config + Content) apply hongi
+
+Database bilkul ready ho jayega
+
+Expected output:
+
+text
+Build started...
+Build succeeded.
+Applying migration '20260817184042_InitialBusinessSchema'.
+Applying migration '20260922211834_AddWorkflowDynamicFields'.
+Applying migration '20260923162627_AddLabelToWorkflowFieldResponses'.
+Applying migration '20260926093232_AddWorkflowFieldAttachments'.
+Applying migration '20260926175042_AddAttachmentConfigToWorkflowNodeFields'.
+Applying migration '20260926203710_MoveAttachmentConfigToSeparateTable'.
+Applying migration '20260927075502_StoreAttachmentBytesInDatabase'.
+Done.
+Done. aa gaya → database ready.
+
+5. Verify karo
+powershell
+sqlcmd -S 'localhost\SQLEXPRESS04' -C -d BankingPlatform2 -Q "SELECT name FROM sys.tables ORDER BY name"
+15 tables dikhni chahiye:
+
+Complaints
+
+Users
+
+WorkflowDefinitions
+
+WorkflowNodeFieldAttachmentConfigs
+
+WorkflowFieldAttachments
+
+aur baaki
+
+6. API chalao
+powershell
+$env:ASPNETCORE_ENVIRONMENT="Development"
+dotnet run --project .\src\BankingPlatform.Api\BankingPlatform.Api.csproj --urls http://localhost:5080
+Output: Now listening on: http://localhost:5080
+
+7. Frontend chalao (naya terminal)
+powershell
+cd <frontend-folder>
+npm install
+npm run dev
+Output: Local: http://localhost:5173
+
+8. Browser me test
+http://localhost:5173 kholo → login → complaint banao → workflow designer me field add karo → task complete karo.
+
+Summary — sirf 3 commands
+Naye laptop pe ye 3 commands zaroori hain:
+
+powershell
+# 1. Connection string check karo (appsettings.json)
+# 2. Database banao
+sqlcmd -S 'localhost\SQLEXPRESS04' -C -Q "CREATE DATABASE BankingPlatform2"
+
+# 3. Migration apply karo
+dotnet ef database update --project .\src\BankingPlatform.Infrastructure --startup-project .\src\BankingPlatform.Api
+Bas. Yehi migration ki command hai.
+
+Agar error aaye — 4 common issues
+Error	Fix
+Could not open a connection to SQL Server	SQL Server ka instance name galat. Get-Service se check karo
+SSL Provider: certificate chain...	sqlcmd me -C flag, ya SQLCMDTRUSTSERVERCERTIFICATE=yes set karo
+A network-related or instance-specific error	SQL Server service Stopped hai — Start-Service 'MSSQL$SQLEXPRESS04'
+Cannot open database "BankingPlatform2"	Pehle CREATE DATABASE chalao
+Ek important baat
+Agar naye laptop pe SQL Server ka instance naam alag hai (jaise SQLEXPRESS bajaye SQLEXPRESS04), to appsettings.json me connection string update karna zaroori hai:
+
+json
+"DefaultConnection": "Server=localhost\\SQLEXPRESS;Database=BankingPlatform2;Trusted_Connection=True;TrustServerCertificate=True;"
+Warna migration nahi chalegi.
+
+Ab ye 4 commands chalao — order me
+powershell
+cd C:\Projects
+git clone https://github.com/UmerAayaz/Alfalah-Complain-Management.git
+cd Alfalah-Complain-Management
+powershell
+Get-Service | Where-Object { $_.Name -like "MSSQL*" } | Select-Object Name, Status
+powershell
+sqlcmd -S 'localhost\SQLEXPRESS04' -C -Q "CREATE DATABASE BankingPlatform2"
+powershell
+dotnet ef database update --project .\src\BankingPlatform.Infrastructure --startup-project .\src\BankingPlatform.Api
+Har output paste karo — agar koi error aaye to exact message bhej do, main fix bata dunga
