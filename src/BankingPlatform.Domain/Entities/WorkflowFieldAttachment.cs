@@ -1,20 +1,20 @@
+using BankingPlatform.Domain.Common;
+
 namespace BankingPlatform.Domain.Entities;
 
-public class WorkflowFieldAttachment
+public class WorkflowFieldAttachment : EntityBase
 {
-    public Guid Id { get; set; }
-
     public Guid WorkflowFieldResponseId { get; set; }
 
     public string FileName { get; set; } = string.Empty;
-
-    public string StoredFileName { get; set; } = string.Empty;
 
     public string ContentType { get; set; } = string.Empty;
 
     public long FileSize { get; set; }
 
-    public string FilePath { get; set; } = string.Empty;
+    public byte[] Content { get; set; } = Array.Empty<byte>();
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? Sha256Hash { get; set; }
+
+    public Guid UploadedByUserId { get; set; }
 }

@@ -25,6 +25,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         base.OnModelCreating(modelBuilder);
 
+        // ============================================================
+        // INDEXES
+        // ============================================================
+
         modelBuilder.Entity<Department>().HasIndex(x => x.Code).IsUnique();
         modelBuilder.Entity<ComplaintCategory>().HasIndex(x => new { x.DepartmentId, x.Code }).IsUnique();
         modelBuilder.Entity<AppUser>().HasIndex(x => x.EmployeeCode).IsUnique();
@@ -36,9 +40,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<WorkflowTask>().HasIndex(x => new { x.Status, x.DueAtUtc });
         modelBuilder.Entity<WorkflowTask>().HasIndex(x => new { x.AssignedToUserId, x.Status });
         modelBuilder.Entity<ComplaintEvent>().HasIndex(x => new { x.ComplaintId, x.CreatedAtUtc });
-
-        modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionX).HasPrecision(18, 2);
-        modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionY).HasPrecision(18, 2);
 
         modelBuilder.Entity<WorkflowNodeField>()
             .HasIndex(x => new { x.WorkflowNodeId, x.FieldKey })
@@ -54,6 +55,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasIndex(x => x.ComplaintId);
 
+        // ============================================================
+        // PRECISION
+        // ============================================================
+
+        modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionX).HasPrecision(18, 2);
+        modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionY).HasPrecision(18, 2);
+
+        // ============================================================
+        // RELATIONSHIPS — Workflow transitions
+        // ============================================================
+
         modelBuilder.Entity<WorkflowTransition>()
             .HasOne(x => x.SourceNode)
             .WithMany()
@@ -65,6 +77,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .WithMany()
             .HasForeignKey(x => x.TargetNodeId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        // ============================================================
+        // RELATIONSHIPS — Workflow instance / complaint
+        // ============================================================
 
         modelBuilder.Entity<WorkflowInstance>()
             .HasOne(x => x.Complaint)
@@ -120,11 +136,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.ComplaintId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // ============================================================
+        // RELATIONSHIPS — Workflow node fields
+        // ============================================================
+
         modelBuilder.Entity<WorkflowNodeField>()
             .HasOne(x => x.WorkflowNode)
             .WithMany(x => x.Fields)
             .HasForeignKey(x => x.WorkflowNodeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.ClientCascade);
+
+        // ============================================================
+        // RELATIONSHIPS — Workflow field responses
+        // ============================================================
 
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.Complaint)
@@ -156,6 +180,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.SubmittedByUserId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // ============================================================
+        // WORKFLOW FIELD ATTACHMENT — DB-only storage
+        // ============================================================
+
         modelBuilder.Entity<WorkflowFieldAttachment>()
             .HasKey(x => x.Id);
 
@@ -165,18 +193,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .IsRequired();
 
         modelBuilder.Entity<WorkflowFieldAttachment>()
-            .Property(x => x.StoredFileName)
-            .HasMaxLength(255)
-            .IsRequired();
-
-        modelBuilder.Entity<WorkflowFieldAttachment>()
             .Property(x => x.ContentType)
-            .HasMaxLength(150);
+            .HasMaxLength(150)
+            .IsRequired();
 
         modelBuilder.Entity<WorkflowFieldAttachment>()
-            .Property(x => x.FilePath)
-            .HasMaxLength(500)
+            .Property(x => x.Content)
+            .HasColumnType("varbinary(max)")
             .IsRequired();
+
+        modelBuilder.Entity<WorkflowFieldAttachment>()
+            .Property(x => x.Sha256Hash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<WorkflowFieldAttachment>()
+            .HasIndex(x => x.UploadedByUserId);
 
         modelBuilder.Entity<WorkflowFieldAttachment>()
             .HasOne<WorkflowFieldResponse>()

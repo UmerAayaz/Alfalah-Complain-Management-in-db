@@ -99,53 +99,51 @@ public sealed class WorkflowTasksController(IWorkflowTaskService service) : Cont
     }
 
     // ============================================================
-    // ATTACHMENT — VIEW (inline)
+    // ATTACHMENT — VIEW (inline, read from database)
     // ============================================================
 
     [HttpGet("attachments/{attachmentId:guid}/view")]
     public async Task<IActionResult> ViewAttachment(
         Guid attachmentId,
         [FromServices] AppDbContext db,
-        [FromServices] IFileStorage storage,
         CancellationToken cancellationToken)
     {
         var att = await db.WorkflowFieldAttachments
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == attachmentId, cancellationToken);
+            .Where(x => x.Id == attachmentId)
+            .Select(x => new { x.Content, x.ContentType })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (att is null)
+        if (att is null || att.Content is null || att.Content.Length == 0)
             return NotFound();
 
-        var stream = await storage.OpenReadAsync(att.FilePath, cancellationToken);
-
         return File(
-            stream,
+            att.Content,
             att.ContentType ?? "application/octet-stream",
             enableRangeProcessing: true);
     }
 
     // ============================================================
-    // ATTACHMENT — DOWNLOAD
+    // ATTACHMENT — DOWNLOAD (read from database)
     // ============================================================
 
     [HttpGet("attachments/{attachmentId:guid}/download")]
     public async Task<IActionResult> DownloadAttachment(
         Guid attachmentId,
         [FromServices] AppDbContext db,
-        [FromServices] IFileStorage storage,
         CancellationToken cancellationToken)
     {
         var att = await db.WorkflowFieldAttachments
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == attachmentId, cancellationToken);
+            .Where(x => x.Id == attachmentId)
+            .Select(x => new { x.Content, x.ContentType, x.FileName })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (att is null)
+        if (att is null || att.Content is null || att.Content.Length == 0)
             return NotFound();
 
-        var stream = await storage.OpenReadAsync(att.FilePath, cancellationToken);
-
         return File(
-            stream,
+            att.Content,
             att.ContentType ?? "application/octet-stream",
             att.FileName);
     }

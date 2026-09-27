@@ -211,15 +211,14 @@ public sealed class WorkflowTaskService(
         var attachments = await db.WorkflowFieldAttachments
             .AsNoTracking()
             .Where(a => responseIds.Contains(a.WorkflowFieldResponseId))
-            .Select(a => new
-            {
-                a.Id,
-                a.WorkflowFieldResponseId,
-                a.FileName,
-                a.ContentType,
-                a.FilePath,
-                a.StoredFileName,
-            })
+           .Select(a => new
+{
+    a.Id,
+    a.WorkflowFieldResponseId,
+    a.FileName,
+    a.ContentType,
+    a.FileSize,          
+})
             .ToListAsync(cancellationToken);
 
         var attachmentsByResponseId = attachments

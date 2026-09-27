@@ -10,11 +10,9 @@ using Microsoft.AspNetCore.Http;
 namespace BankingPlatform.Infrastructure.Services;
 
 public sealed class SqlWorkflowRuntime(
-    AppDbContext db,
-    IFileStorage fileStorage) : IWorkflowRuntime
+    AppDbContext db) : IWorkflowRuntime
 {
     private readonly AppDbContext _db = db;
-    private readonly IFileStorage _fileStorage = fileStorage;
 
     // ============================================================
     // START
@@ -195,33 +193,31 @@ public sealed class SqlWorkflowRuntime(
                     if (file.Length <= 0)
                         continue;
 
-                    var extension = Path.GetExtension(file.FileName);
-                    var storedFileName = $"{Guid.NewGuid()}{extension}";
+                    // Read file bytes into memory
+                    using var ms = new MemoryStream();
+                    await file.CopyToAsync(ms, cancellationToken);
+                    var content = ms.ToArray();
 
-                    // Storage relative path inside the storage root
-                    var relativePath = Path
-                        .Combine("workflow-attachments", storedFileName)
-                        .Replace("\\", "/");
-
-                    // Save via the abstracted storage (disk root configured in Program.cs)
-                    await _fileStorage.SaveAsync(
-                        file.OpenReadStream(),
-                        relativePath,
-                        file.ContentType ?? "application/octet-stream",
-                        cancellationToken);
+                    // SHA-256 for integrity
+                    string? hash = null;
+                    using (var sha = System.Security.Cryptography.SHA256.Create())
+                    {
+                        hash = Convert.ToHexString(sha.ComputeHash(content)).ToLowerInvariant();
+                    }
 
                     db.WorkflowFieldAttachments.Add(new WorkflowFieldAttachment
                     {
                         Id = Guid.NewGuid(),
                         WorkflowFieldResponseId = response.Id,
                         FileName = file.FileName,
-                        StoredFileName = storedFileName,
                         ContentType = string.IsNullOrWhiteSpace(file.ContentType)
                             ? "application/octet-stream"
                             : file.ContentType,
                         FileSize = file.Length,
-                        FilePath = relativePath,
-                        CreatedAt = DateTime.UtcNow
+                        Content = content,
+                        Sha256Hash = hash,
+                        UploadedByUserId = actorUserId,
+                        CreatedAtUtc = DateTime.UtcNow
                     });
                 }
             }

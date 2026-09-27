@@ -12,8 +12,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 {
     public async Task<WorkflowDefinitionDto> CreateAsync(CreateWorkflowDefinitionRequest request, CancellationToken cancellationToken)
     {
-        LogIncomingFields("CreateAsync", request);   // DEBUG
-
         Validate(request);
         await EnsureDepartmentAdminAsync(request.DepartmentId, cancellationToken);
 
@@ -42,42 +40,96 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         return Map(definition);
     }
 
-    public async Task<WorkflowDefinitionDto> UpdateDraftAsync(Guid id, CreateWorkflowDefinitionRequest request, CancellationToken cancellationToken)
-    {
-        LogIncomingFields("UpdateDraftAsync", request);   // DEBUG
+    // ============================================================
+    // UPDATE DRAFT — pure raw SQL, no EF UPDATE/DELETE
+    // ============================================================
 
+    public async Task<WorkflowDefinitionDto> UpdateDraftAsync(
+        Guid id,
+        CreateWorkflowDefinitionRequest request,
+        CancellationToken cancellationToken)
+    {
         Validate(request);
 
-        var definition = await db.WorkflowDefinitions
-            .Include(x => x.Nodes)
-                .ThenInclude(x => x.Fields)
-                    .ThenInclude(x => x.AttachmentConfig)
-            .Include(x => x.Transitions)
+        // ---- 1. Load fresh WITHOUT tracking ----
+        var existing = await db.WorkflowDefinitions
+            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Workflow definition not found.");
 
-        await EnsureDepartmentAdminAsync(definition.DepartmentId, cancellationToken);
+        await EnsureDepartmentAdminAsync(existing.DepartmentId, cancellationToken);
 
-        if (request.DepartmentId != definition.DepartmentId || request.CategoryId != definition.CategoryId)
-            throw new InvalidOperationException("A draft version cannot be moved to another department/category. Create a new workflow there instead.");
+        if (request.DepartmentId != existing.DepartmentId ||
+            request.CategoryId != existing.CategoryId)
+            throw new InvalidOperationException(
+                "A draft version cannot be moved to another department/category. Create a new workflow there instead.");
 
-        if (definition.Status != WorkflowDefinitionStatus.Draft)
-            throw new InvalidOperationException("Published workflows are immutable. Create a new version instead.");
+        if (existing.Status != WorkflowDefinitionStatus.Draft)
+            throw new InvalidOperationException(
+                "Published workflows are immutable. Create a new version instead.");
 
-        definition.Name = request.Name.Trim();
-        definition.DepartmentId = request.DepartmentId;
-        definition.CategoryId = request.CategoryId;
-        definition.DesignerJson = JsonSerializer.Serialize(request);
-        definition.UpdatedAtUtc = DateTime.UtcNow;
+        // ---- 2. Clear any tracked entities ----
+        db.ChangeTracker.Clear();
 
-        db.WorkflowTransitions.RemoveRange(definition.Transitions);
-        db.WorkflowNodes.RemoveRange(definition.Nodes);
-        definition.Transitions.Clear();
-        definition.Nodes.Clear();
-        BuildGraph(definition, request);
+        // ---- 3. Delete all children via raw SQL (deepest first) ----
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            DELETE FROM WorkflowNodeFieldAttachmentConfigs
+            WHERE WorkflowNodeFieldId IN (
+                SELECT f.Id
+                FROM WorkflowNodeFields f
+                INNER JOIN WorkflowNodes n ON n.Id = f.WorkflowNodeId
+                WHERE n.WorkflowDefinitionId = {id}
+            )", cancellationToken);
 
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            DELETE FROM WorkflowNodeFields
+            WHERE WorkflowNodeId IN (
+                SELECT Id FROM WorkflowNodes WHERE WorkflowDefinitionId = {id}
+            )", cancellationToken);
+
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            DELETE FROM WorkflowTransitions
+            WHERE WorkflowDefinitionId = {id}", cancellationToken);
+
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            DELETE FROM WorkflowNodes
+            WHERE WorkflowDefinitionId = {id}", cancellationToken);
+
+        // ---- 4. Update parent row via raw SQL (no EF UPDATE) ----
+        var designerJson = JsonSerializer.Serialize(request);
+        var now = DateTime.UtcNow;
+
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE WorkflowDefinitions
+            SET Name = {request.Name.Trim()},
+                DepartmentId = {request.DepartmentId},
+                CategoryId = {request.CategoryId},
+                DesignerJson = {designerJson},
+                UpdatedAtUtc = {now}
+            WHERE Id = {id}", cancellationToken);
+
+        // ---- 5. Reload parent fresh (no tracking) ----
+        db.ChangeTracker.Clear();
+
+        var fresh = await db.WorkflowDefinitions
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == id, cancellationToken);
+
+        // Attach as Unchanged so EF won't try to UPDATE it
+        db.WorkflowDefinitions.Attach(fresh);
+        db.Entry(fresh).State = EntityState.Unchanged;
+
+        // Ensure nav collections are empty (they are, since no-tracking)
+        fresh.Nodes.Clear();
+        fresh.Transitions.Clear();
+
+        // ---- 6. Build new graph (only INSERTs now) ----
+        BuildGraph(fresh, request);
+
+        // ---- 7. Save — EF only INSERTs new rows ----
         await db.SaveChangesAsync(cancellationToken);
-        return Map(definition);
+
+        return Map(fresh);
     }
 
     public async Task<WorkflowDefinitionDto> PublishAsync(Guid id, CancellationToken cancellationToken)
@@ -171,42 +223,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
     private static WorkflowDefinitionDto Map(WorkflowDefinition x) =>
         new(x.Id, x.Name, x.DepartmentId, x.CategoryId, x.Version, x.Status, x.DesignerJson, x.PublishedAtUtc);
-
-    // ============================================================
-    // DEBUG HELPER — remove after diagnosing
-    // ============================================================
-
-    private static void LogIncomingFields(string methodName, CreateWorkflowDefinitionRequest request)
-    {
-        Console.WriteLine($"========== INCOMING REQUEST [{methodName}] ==========");
-        Console.WriteLine($"Workflow: {request.Name}");
-
-        foreach (var node in request.Nodes)
-        {
-            Console.WriteLine($"Node: {node.Name} | Type={node.Type}");
-
-            if (node.Fields is null)
-            {
-                Console.WriteLine("  (no fields)");
-                continue;
-            }
-
-            foreach (var f in node.Fields)
-            {
-                var types = f.AllowedFileTypes is null
-                    ? "null"
-                    : $"[{string.Join(",", f.AllowedFileTypes)}]";
-
-                Console.WriteLine(
-                    $"  Field: {f.FieldKey} | Type={f.FieldType} | " +
-                    $"AllowedTypes={types} | " +
-                    $"MaxSize={f.MaxFileSizeMb?.ToString() ?? "null"} | " +
-                    $"Multiple={f.AllowMultiple?.ToString() ?? "null"}");
-            }
-        }
-
-        Console.WriteLine("====================================================");
-    }
 
     // ============================================================
     // BUILD GRAPH (nodes + fields + transitions)
