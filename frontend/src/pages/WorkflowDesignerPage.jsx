@@ -520,7 +520,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
             >
               ← Library
             </button>            
-            {!readOnly && (
+            {/* {!readOnly && (
               <button
                 className="btn btn-secondary"
                 disabled={saving}
@@ -528,7 +528,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               >
                 {saving ? 'Saving…' : 'Save draft'}
               </button>
-            )}
+            )} */}
             {!readOnly && (
               <button
                 className="btn btn-primary"
