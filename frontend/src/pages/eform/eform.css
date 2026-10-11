@@ -1,0 +1,691 @@
+/* ============================================================
+   E-FORM — RED & WHITE THEME
+   ============================================================ */
+
+:root {
+  --eform-red: #dc2626;
+  --eform-red-dark: #b91c1c;
+  --eform-red-light: #fef2f2;
+  --eform-red-soft: #fee2e2;
+  --eform-red-border: #fecaca;
+  --eform-text: #1f2937;
+  --eform-text-muted: #6b7280;
+  --eform-text-light: #9ca3af;
+  --eform-border: #f3f4f6;
+  --eform-border-dark: #e5e7eb;
+  --eform-bg: #ffffff;
+  --eform-bg-soft: #fafafa;
+  --eform-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --eform-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --eform-shadow-red: 0 4px 14px rgba(220, 38, 38, 0.25);
+}
+
+/* ============================================================
+   DATA TABLE
+   ============================================================ */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.data-table thead {
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.data-table th {
+  text-align: left;
+  padding: 14px 18px;
+  font-weight: 600;
+  color: var(--eform-red-dark);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid var(--eform-red-border);
+}
+
+.data-table td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--eform-border);
+  color: var(--eform-text);
+  vertical-align: middle;
+}
+
+.data-table tbody tr { transition: background 0.15s ease; }
+.data-table tbody tr:hover td { background: var(--eform-red-light); }
+.data-table tbody tr:last-child td { border-bottom: none; }
+
+.data-table code {
+  display: inline-block;
+  background: var(--eform-red-light);
+  color: var(--eform-red-dark);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Consolas', 'Monaco', monospace;
+  border: 1px solid var(--eform-red-border);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.btn-danger-soft {
+  background: #fff;
+  color: var(--eform-red);
+  border: 1.5px solid var(--eform-red-border);
+  transition: all 0.15s ease;
+}
+
+.btn-danger-soft:hover {
+  background: var(--eform-red);
+  color: #fff;
+  border-color: var(--eform-red);
+  box-shadow: var(--eform-shadow-red);
+}
+
+/* ============================================================
+   BADGES
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.badge-info {
+  background: var(--eform-red-light);
+  color: var(--eform-red-dark);
+  border: 1px solid var(--eform-red-border);
+}
+
+.badge-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-type {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid var(--eform-border-dark);
+  text-transform: capitalize;
+}
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-wide {
+  max-width: 760px;
+  width: 92%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-wide .modal-header {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 60%, #fee2e2 100%);
+  border-bottom: 1px solid var(--eform-red-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+}
+
+.modal-wide .modal-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 80px;
+  height: 3px;
+  background: var(--eform-red);
+  border-radius: 0 2px 0 0;
+}
+
+.modal-wide .modal-header h2 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--eform-text);
+  letter-spacing: -0.3px;
+}
+
+.modal-wide .modal-header .muted-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--eform-text-muted);
+}
+
+.modal-wide .icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--eform-border-dark);
+  background: #fff;
+  color: var(--eform-text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-wide .icon-button:hover {
+  background: var(--eform-red);
+  border-color: var(--eform-red);
+  color: #fff;
+}
+
+.modal-body-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--eform-bg-soft);
+}
+
+.modal-wide .modal-actions {
+  padding: 16px 24px;
+  border-top: 1px solid var(--eform-border);
+  background: #fff;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ============================================================
+   SECTION BLOCKS — Same style everywhere
+   ============================================================ */
+.section-block {
+  background: #fff;
+  border: 1px solid var(--eform-border);
+  border-left: 4px solid var(--eform-red);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.15s ease;
+}
+
+.section-block:hover {
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.06);
+}
+
+.section-block .designer-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--eform-red-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--eform-red-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-block .designer-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--eform-red);
+  flex-shrink: 0;
+}
+
+.section-block--test {
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+  border-left-color: var(--eform-red-dark);
+}
+
+.section-block--test .designer-section-title::before {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+.section-block .form-row { margin-bottom: 14px; }
+.section-block .form-row:last-child { margin-bottom: 0; }
+.section-block .field.compact { margin-bottom: 14px; }
+.section-block .field.compact:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   FORM FIELDS
+   ============================================================ */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+.field.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field.compact > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--eform-text);
+}
+
+.field.compact .input {
+  padding: 10px 14px;
+  border: 1.5px solid var(--eform-border-dark);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--eform-text);
+  background: #fff;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  width: 100%;
+}
+
+.field.compact .input:hover { border-color: #d1d5db; }
+
+.field.compact .input:focus {
+  outline: none;
+  border-color: var(--eform-red);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.field.compact .input::placeholder { color: var(--eform-text-light); }
+
+.field.compact .input:disabled {
+  background: #f9fafb;
+  color: var(--eform-text-muted);
+  cursor: not-allowed;
+}
+
+.field.compact .textarea {
+  resize: vertical;
+  min-height: 90px;
+  font-family: inherit;
+}
+
+.field.compact small.muted-text {
+  font-size: 11px;
+  color: var(--eform-text-light);
+}
+
+.input.mono {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+
+.req {
+  color: var(--eform-red);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* ============================================================
+   CHECKBOX
+   ============================================================ */
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--eform-text);
+  margin: 6px 0;
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 0;
+}
+
+.checkbox-field input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--eform-red);
+}
+
+/* ============================================================
+   CHIPS (attachment types)
+   ============================================================ */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--eform-border-dark);
+  background: #fff;
+  color: var(--eform-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.chip:hover {
+  border-color: var(--eform-red);
+  color: var(--eform-red);
+}
+
+.chip-active {
+  background: var(--eform-red);
+  border-color: var(--eform-red);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+
+.chip-active:hover {
+  background: var(--eform-red-dark);
+  border-color: var(--eform-red-dark);
+  color: #fff;
+}
+
+/* ============================================================
+   TEST RESULT
+   ============================================================ */
+.test-result {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideDown 0.2s ease-out;
+}
+
+.test-result.ok {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1.5px solid #86efac;
+}
+
+.test-result.fail {
+  background: var(--eform-red-light);
+  color: var(--eform-red-dark);
+  border: 1.5px solid var(--eform-red-border);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   FORM BUILDER LAYOUT
+   ============================================================ */
+.form-builder-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .form-builder-shell { grid-template-columns: 1fr; }
+}
+
+.form-builder-library {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--eform-border);
+  border-radius: 12px;
+}
+
+.form-builder-canvas {
+  min-height: 400px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--eform-border);
+  border-radius: 12px;
+}
+
+/* ============================================================
+   LIBRARY FIELD ITEMS
+   ============================================================ */
+.library-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.library-field-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--eform-border-dark);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.library-field-item:hover:not(:disabled) {
+  border-color: var(--eform-red);
+  background: var(--eform-red-light);
+  transform: translateX(2px);
+}
+
+.library-field-item.added {
+  background: #f0fdf4;
+  border-color: #86efac;
+  cursor: default;
+  opacity: 0.85;
+}
+
+.library-field-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--eform-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-field-type {
+  font-size: 10px;
+  color: var(--eform-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--eform-border);
+  border-radius: 4px;
+}
+
+.library-field-add {
+  color: var(--eform-red);
+  font-weight: 700;
+  font-size: 20px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.library-field-check {
+  color: #16a34a;
+  font-weight: 700;
+  font-size: 16px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ============================================================
+   FORM CANVAS ITEMS
+   ============================================================ */
+.form-canvas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-canvas-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--eform-border);
+  border-left: 4px solid var(--eform-red);
+  border-radius: 10px;
+  background: #fff;
+  transition: all 0.15s ease;
+}
+
+.form-canvas-item:hover {
+  background: var(--eform-red-light);
+  box-shadow: var(--eform-shadow);
+}
+
+.form-canvas-item-info { flex: 1; min-width: 0; }
+
+.form-canvas-item-info strong {
+  display: block;
+  font-size: 14px;
+  color: var(--eform-text);
+  margin-bottom: 4px;
+}
+
+.form-canvas-item-info .muted-text {
+  font-size: 11px;
+  color: var(--eform-text-muted);
+}
+
+.form-canvas-item-actions { display: flex; gap: 4px; }
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.inline-empty {
+  text-align: center;
+  color: var(--eform-text-light);
+  font-size: 14px;
+  padding: 32px 20px;
+  font-style: italic;
+  background: var(--eform-bg-soft);
+  border: 1px dashed var(--eform-border-dark);
+  border-radius: 10px;
+}
+
+/* ============================================================
+   MISC
+   ============================================================ */
+.panel {
+  background: #fff;
+  border: 1px solid var(--eform-border);
+  border-radius: 12px;
+  box-shadow: var(--eform-shadow-sm);
+  overflow: hidden;
+}
+
+.muted { color: var(--eform-text-light); }
+.muted-text { color: var(--eform-text-muted); font-size: 12px; }
+
+.loading-block {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--eform-text-muted);
+  font-size: 14px;
+}
+
+.page-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+.modal-body-scroll::-webkit-scrollbar,
+.form-builder-library::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body-scroll::-webkit-scrollbar-thumb,
+.form-builder-library::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 6px;
+}
+
+.modal-body-scroll::-webkit-scrollbar-thumb:hover,
+.form-builder-library::-webkit-scrollbar-thumb:hover {
+  background: var(--eform-red);
+}
+
+.checkbox-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--eform-text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.checkbox-field-inline:hover {
+  background: var(--eform-red-light);
+  color: var(--eform-red);
+}
+
+.checkbox-field-inline input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--eform-red);
+}

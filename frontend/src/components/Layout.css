@@ -19,7 +19,7 @@
   --sb-text-muted: #6b7280;
   --sb-border: #f3f4f6;
   --sb-hover-bg: #fef2f2;
-  --sb-active-bg: #dc2626;
+  --sb-active-bg: #b5121b;
   --sb-active-text: #ffffff;
   --sb-accent: #dc2626;
   --sb-accent-dark: #b91c1c;
@@ -442,7 +442,7 @@
 
 .app-sidebar__nav::-webkit-scrollbar-thumb:hover,
 .role-switcher__menu::-webkit-scrollbar-thumb:hover {
-  background: #dc2626;
+  background: #b5121b;
 }
 
 /* Avatar in header */

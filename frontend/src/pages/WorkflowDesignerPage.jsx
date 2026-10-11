@@ -140,6 +140,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
+  const [forms, setForms] = useState([])
 
   const selectedNode = useMemo(
     () => nodes.find((x) => x.id === selectedNodeId),
@@ -150,6 +151,12 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     [edges, selectedEdgeId]
   )
   const readOnly = definition && definition.status !== 0
+
+  // Only Published forms can be attached to a workflow
+  const publishedForms = useMemo(
+    () => forms.filter((f) => f.status === 'Published'),
+    [forms]
+  )
 
   const scheduleFitView = () => {
     setTimeout(() => {
@@ -162,6 +169,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     }, 50)
   }
 
+  // ---- Load departments ----
   useEffect(() => {
     api('/reference/departments')
       .then((items) => {
@@ -171,6 +179,14 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .catch((err) => setError(err.message))
   }, [isNew])
 
+  // ---- Load available forms ----
+  useEffect(() => {
+    api('/forms')
+      .then((items) => setForms(Array.isArray(items) ? items : []))
+      .catch((err) => console.error('Forms load failed:', err))
+  }, [])
+
+  // ---- Load categories ----
   useEffect(() => {
     if (!departmentId) return
     api(`/reference/categories?departmentId=${departmentId}`)
@@ -183,6 +199,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .catch((err) => setError(err.message))
   }, [departmentId])
 
+  // ---- Load existing workflow ----
   useEffect(() => {
     if (isNew || !workflowId) return
     setLoading(true)
@@ -215,6 +232,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               assignmentMode: config.assignmentMode || 'queue',
               sendEmailNotification: config.sendEmailNotification ?? false,
               fields: read(n, 'fields', 'Fields') || [],
+              formId: read(n, 'formId', 'FormId') || null,
             },
           }
         })
@@ -239,7 +257,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
         const laidOutNodes = applyHorizontalLayout(mappedNodes)
         setNodes(laidOutNodes)
 
-        // If existing workflow has edges, keep them. Otherwise rebuild chain.
         setEdges(
           mappedEdges.length > 0 ? mappedEdges : buildChainEdges(laidOutNodes)
         )
@@ -268,7 +285,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   )
 
   // ============================================================
-  // ADD HUMAN NODE — insert + auto-connect
+  // ADD HUMAN NODE
   // ============================================================
   const addHumanNode = () => {
     const id = `step-${crypto.randomUUID().slice(0, 8)}`
@@ -289,14 +306,12 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
             assignmentMode: 'queue',
             sendEmailNotification: false,
             fields: [],
+            formId: null,
           },
         },
       ]
       const laidOut = applyHorizontalLayout(next)
-
-      // Auto-connect: rebuild chain edges from sorted nodes
       setEdges(buildChainEdges(laidOut))
-
       return laidOut
     })
 
@@ -306,7 +321,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   }
 
   // ============================================================
-  // ADD END NODE — insert + auto-connect
+  // ADD END NODE
   // ============================================================
   const addEndNode = () => {
     const id = `end-${crypto.randomUUID().slice(0, 8)}`
@@ -318,14 +333,15 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
           id,
           type: 'workflowNode',
           position: { x: LAYOUT.START_X, y: LAYOUT.START_Y },
-          data: { label: 'Completed', nodeType: 2 },
+          data: {
+            label: 'Completed',
+            nodeType: 2,
+            formId: null,
+          },
         },
       ]
       const laidOut = applyHorizontalLayout(next)
-
-      // Auto-connect
       setEdges(buildChainEdges(laidOut))
-
       return laidOut
     })
 
@@ -358,18 +374,12 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     )
   }
 
-  // ============================================================
-  // DELETE — remove + auto-reconnect
-  // ============================================================
   const deleteSelection = () => {
     if (selectedNodeId) {
       setNodes((current) => {
         const filtered = current.filter((x) => x.id !== selectedNodeId)
         const laidOut = applyHorizontalLayout(filtered)
-
-        // Auto-reconnect after delete
         setEdges(buildChainEdges(laidOut))
-
         return laidOut
       })
       setSelectedNodeId('')
@@ -380,6 +390,9 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     }
   }
 
+  // ============================================================
+  // PAYLOAD
+  // ============================================================
   const toPayload = () => ({
     name: name.trim(),
     departmentId,
@@ -389,6 +402,11 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       key: node.id,
       name: node.data.label,
       type: Number(node.data.nodeType),
+
+      formId:
+        Number(node.data.nodeType) === 1
+          ? node.data.formId || null
+          : null,
 
       roleCode:
         Number(node.data.nodeType) === 1
@@ -479,9 +497,52 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   }
 
   const publish = async () => {
+    // ---- Client-side validation before calling API ----
+    const startCount = nodes.filter(
+      (n) => Number(n.data.nodeType) === 0
+    ).length
+
+    if (startCount !== 1) {
+      setError(
+        `Workflow must have exactly 1 Start node. Currently: ${startCount}.`
+      )
+      return
+    }
+
+    const endCount = nodes.filter(
+      (n) => Number(n.data.nodeType) === 2
+    ).length
+
+    if (endCount < 1) {
+      setError('Workflow must have at least 1 End node.')
+      return
+    }
+
+    if (nodes.length < 2) {
+      setError('Workflow must have Start and End nodes.')
+      return
+    }
+
+    // Validate attached forms are published
+    const unpublished = nodes.filter(
+      (n) =>
+        Number(n.data.nodeType) === 1 &&
+        n.data.formId &&
+        !publishedForms.some((f) => f.id === n.data.formId)
+    )
+
+    if (unpublished.length > 0) {
+      setError(
+        `Some attached forms are not Published. Please publish them first or detach.`
+      )
+      return
+    }
+
     const saved = await save()
     if (!saved) return
+
     setSaving(true)
+    setError('')
     try {
       const published = await api(
         `/workflow-definitions/${saved.id}/publish`,
@@ -519,23 +580,14 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               onClick={() => navigate('/workflows')}
             >
               ← Library
-            </button>            
-            {/* {!readOnly && (
-              <button
-                className="btn btn-secondary"
-                disabled={saving}
-                onClick={save}
-              >
-                {saving ? 'Saving…' : 'Save draft'}
-              </button>
-            )} */}
+            </button>
             {!readOnly && (
               <button
                 className="btn btn-primary"
                 disabled={saving}
                 onClick={publish}
               >
-                Publish
+                {saving ? 'Publishing…' : 'Publish'}
               </button>
             )}
           </div>
@@ -633,7 +685,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               nodesConnectable={!readOnly}
               elementsSelectable
 
-              // ---- Zoom & Fit ----
               fitView
               fitViewOptions={{
                 padding: VIEW.FIT_PADDING,
@@ -644,7 +695,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               maxZoom={VIEW.MAX_ZOOM}
               defaultViewport={{ x: 0, y: 0, zoom: 1 }}
 
-              // ---- Pan & Scroll ----
               panOnDrag={true}
               panOnScroll={true}
               zoomOnScroll={false}
@@ -757,6 +807,32 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                       <option value="queue">Role queue</option>
                       <option value="specific">Require specific user</option>
                     </select>
+                  </label>
+
+                  {/* ---------- ATTACHED FORM (only Published) ---------- */}
+                  <label className="field compact">
+                    <span>Attached Form (optional)</span>
+                    <select
+                      className="input"
+                      value={selectedNode.data.formId || ''}
+                      onChange={(e) =>
+                        updateSelectedNode({ formId: e.target.value || null })
+                      }
+                      disabled={readOnly}
+                    >
+                      <option value="">— No form (use inline fields) —</option>
+                      {publishedForms.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                          {f.version > 1 ? ` (v${f.version})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="muted-text">
+                      Only <strong>published</strong> forms appear here.
+                      {publishedForms.length === 0 &&
+                        ' No published forms available yet.'}
+                    </small>
                   </label>
 
                   <div className="workflow-toggle-row">

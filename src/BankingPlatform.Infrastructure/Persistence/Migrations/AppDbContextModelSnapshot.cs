@@ -17,7 +17,7 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -254,6 +254,201 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("DepartmentMemberships");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.Form", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("FormKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormKey", "Version")
+                        .IsUnique();
+
+                    b.ToTable("Forms");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.FormField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("FormId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool?>("IsRequiredOverride")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LabelOverride")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("LibraryFieldId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("LibraryFieldId");
+
+                    b.ToTable("FormFields");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.LibraryField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("MaxLength")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MaxValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("MinLength")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("OptionsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Placeholder")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("RegexMessage")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("RegexPattern")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ValidationType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FieldKey")
+                        .IsUnique();
+
+                    b.ToTable("LibraryFields");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.LibraryFieldAttachmentConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool?>("AllowMultiple")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AllowedFileTypesJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("LibraryFieldId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("MaxFileSizeMb")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LibraryFieldId")
+                        .IsUnique();
+
+                    b.ToTable("LibraryFieldAttachmentConfigs");
+                });
+
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -365,6 +560,9 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Label")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("LibraryFieldId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("SubmittedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -377,7 +575,7 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("ValueJson")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("WorkflowNodeFieldId")
+                    b.Property<Guid?>("WorkflowNodeFieldId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("WorkflowNodeId")
@@ -390,14 +588,15 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ComplaintId");
 
+                    b.HasIndex("LibraryFieldId");
+
                     b.HasIndex("SubmittedByUserId");
 
                     b.HasIndex("WorkflowNodeFieldId");
 
                     b.HasIndex("WorkflowNodeId");
 
-                    b.HasIndex("WorkflowTaskId", "WorkflowNodeFieldId")
-                        .IsUnique();
+                    b.HasIndex("WorkflowTaskId");
 
                     b.ToTable("WorkflowFieldResponses");
                 });
@@ -458,6 +657,9 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("EscalationRoleCode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("FormId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -490,6 +692,8 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FormId");
 
                     b.HasIndex("WorkflowDefinitionId", "NodeKey")
                         .IsUnique();
@@ -756,6 +960,36 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.FormField", b =>
+                {
+                    b.HasOne("BankingPlatform.Domain.Entities.Form", "Form")
+                        .WithMany("Fields")
+                        .HasForeignKey("FormId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BankingPlatform.Domain.Entities.LibraryField", "LibraryField")
+                        .WithMany()
+                        .HasForeignKey("LibraryFieldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Form");
+
+                    b.Navigation("LibraryField");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.LibraryFieldAttachmentConfig", b =>
+                {
+                    b.HasOne("BankingPlatform.Domain.Entities.LibraryField", "LibraryField")
+                        .WithOne("AttachmentConfig")
+                        .HasForeignKey("BankingPlatform.Domain.Entities.LibraryFieldAttachmentConfig", "LibraryFieldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LibraryField");
+                });
+
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowDefinition", b =>
                 {
                     b.HasOne("BankingPlatform.Domain.Entities.ComplaintCategory", "Category")
@@ -792,6 +1026,11 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("BankingPlatform.Domain.Entities.LibraryField", "LibraryField")
+                        .WithMany()
+                        .HasForeignKey("LibraryFieldId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("BankingPlatform.Domain.Entities.AppUser", "SubmittedByUser")
                         .WithMany()
                         .HasForeignKey("SubmittedByUserId")
@@ -801,8 +1040,7 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.HasOne("BankingPlatform.Domain.Entities.WorkflowNodeField", "WorkflowNodeField")
                         .WithMany()
                         .HasForeignKey("WorkflowNodeFieldId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("BankingPlatform.Domain.Entities.WorkflowNode", "WorkflowNode")
                         .WithMany()
@@ -817,6 +1055,8 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Complaint");
+
+                    b.Navigation("LibraryField");
 
                     b.Navigation("SubmittedByUser");
 
@@ -854,13 +1094,16 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNode", b =>
                 {
-                    b.HasOne("BankingPlatform.Domain.Entities.WorkflowDefinition", "WorkflowDefinition")
+                    b.HasOne("BankingPlatform.Domain.Entities.Form", null)
+                        .WithMany()
+                        .HasForeignKey("FormId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BankingPlatform.Domain.Entities.WorkflowDefinition", null)
                         .WithMany("Nodes")
                         .HasForeignKey("WorkflowDefinitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("WorkflowDefinition");
                 });
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNodeField", b =>
@@ -943,6 +1186,16 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("TargetNode");
 
                     b.Navigation("WorkflowDefinition");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.Form", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.LibraryField", b =>
+                {
+                    b.Navigation("AttachmentConfig");
                 });
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowDefinition", b =>

@@ -49,32 +49,26 @@ public sealed class WorkflowNodeFieldAttachmentConfig : EntityBase
     /// </summary>
     public bool? AllowMultiple { get; set; }
 }
-
 public sealed class WorkflowFieldResponse : EntityBase
 {
     public Guid ComplaintId { get; set; }
-
     public Complaint Complaint { get; set; } = null!;
-
     public Guid WorkflowTaskId { get; set; }
-
     public WorkflowTask WorkflowTask { get; set; } = null!;
-
     public Guid WorkflowNodeId { get; set; }
-
     public WorkflowNode WorkflowNode { get; set; } = null!;
 
-    public Guid WorkflowNodeFieldId { get; set; }
+    // Inline field (nullable — form-attached tasks use LibraryFieldId instead)
+    public Guid? WorkflowNodeFieldId { get; set; }
+    public WorkflowNodeField? WorkflowNodeField { get; set; }
 
-    public WorkflowNodeField WorkflowNodeField { get; set; } = null!;
+    // Library field (nullable — only set when form-attached task)
+    public Guid? LibraryFieldId { get; set; }
+    public LibraryField? LibraryField { get; set; }
 
     public Guid SubmittedByUserId { get; set; }
-
     public AppUser SubmittedByUser { get; set; } = null!;
-
     public string? ValueJson { get; set; }
-
     public string? Label { get; set; }
-
     public DateTime SubmittedAtUtc { get; set; } = DateTime.UtcNow;
 }

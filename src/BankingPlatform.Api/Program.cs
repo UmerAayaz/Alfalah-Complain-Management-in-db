@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Storage;
+using BankingPlatform.Application.Abstractions;
+using BankingPlatform.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +18,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, DevHeaderCurrentUser>();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddCors(options =>
+builder.Services.AddScoped<ILibraryFieldService, LibraryFieldService>();
+builder.Services.AddScoped<IFormService, FormService>();
+builder.Services.AddCors(options => 
 {
     options.AddPolicy("frontend", policy => policy
         .WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? ["http://localhost:5173"])

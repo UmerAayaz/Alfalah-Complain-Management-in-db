@@ -276,22 +276,22 @@ export default function WorkflowFieldBuilder({
 
   return (
     <div className="workflow-field-builder">
-      <div className="designer-section-title">Step fields</div>
+      {/* <div className="designer-section-title">Step fields</div>
 
       <p className="muted-text">
         These fields will be editable by the person completing this
         step. Earlier step values will appear read-only.
-      </p>
+      </p> */}
 
       {/* ---------------------------------------
           EXISTING FIELDS
       --------------------------------------- */}
 
-      {fields.length === 0 && (
+      {/* {fields.length === 0 && (
         <div className="workflow-fields-empty">
           No fields added to this step.
         </div>
-      )}
+      )} */}
 
       {fields.map((field, index) => (
         <div
@@ -342,7 +342,7 @@ export default function WorkflowFieldBuilder({
           )}
         </div>
       ))}
-
+{/* 
       {!disabled && (
         <button
           type="button"
@@ -351,7 +351,7 @@ export default function WorkflowFieldBuilder({
         >
           + Add field
         </button>
-      )}
+      )} */}
 
       {/* ---------------------------------------
           ADD / EDIT FIELD MODAL

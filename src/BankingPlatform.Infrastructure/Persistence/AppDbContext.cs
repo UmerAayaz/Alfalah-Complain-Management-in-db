@@ -20,6 +20,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<WorkflowFieldAttachment> WorkflowFieldAttachments => Set<WorkflowFieldAttachment>();
     public DbSet<WorkflowNodeFieldAttachmentConfig> WorkflowNodeFieldAttachmentConfigs => Set<WorkflowNodeFieldAttachmentConfig>();
     public DbSet<WorkflowFieldResponse> WorkflowFieldResponses => Set<WorkflowFieldResponse>();
+    public DbSet<LibraryField> LibraryFields => Set<LibraryField>();
+    public DbSet<LibraryFieldAttachmentConfig> LibraryFieldAttachmentConfigs => Set<LibraryFieldAttachmentConfig>();
+    public DbSet<Form> Forms => Set<Form>();
+    public DbSet<FormField> FormFields => Set<FormField>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -49,10 +53,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasIndex(x => new { x.WorkflowNodeId, x.DisplayOrder });
 
         modelBuilder.Entity<WorkflowFieldResponse>()
-            .HasIndex(x => new { x.WorkflowTaskId, x.WorkflowNodeFieldId })
-            .IsUnique();
-
-        modelBuilder.Entity<WorkflowFieldResponse>()
             .HasIndex(x => x.ComplaintId);
 
         // ============================================================
@@ -61,6 +61,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionX).HasPrecision(18, 2);
         modelBuilder.Entity<WorkflowNode>().Property(x => x.PositionY).HasPrecision(18, 2);
+
+        // ============================================================
+        // WORKFLOW NODE → FORM (optional FK)
+        // ============================================================
+
+        modelBuilder.Entity<WorkflowNode>()
+            .HasOne<Form>()
+            .WithMany()
+            .HasForeignKey(x => x.FormId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         // ============================================================
         // RELATIONSHIPS — Workflow transitions
@@ -96,8 +107,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         // -----------------------------------------------------
         // Prevent SQL Server multiple cascade paths.
-        // Core workflow/history records should never be
-        // automatically deleted through parent records.
         // -----------------------------------------------------
 
         modelBuilder.Entity<WorkflowDefinition>()
@@ -168,11 +177,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.WorkflowNodeId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // ---- Inline field (optional — nullable for form-based tasks) ----
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.WorkflowNodeField)
             .WithMany()
             .HasForeignKey(x => x.WorkflowNodeFieldId)
-            .OnDelete(DeleteBehavior.NoAction);
+            .OnDelete(DeleteBehavior.NoAction)
+            .IsRequired(false);
+
+        // ---- Library field (optional — nullable for inline-field tasks) ----
+        modelBuilder.Entity<WorkflowFieldResponse>()
+            .HasOne(x => x.LibraryField)
+            .WithMany()
+            .HasForeignKey(x => x.LibraryFieldId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .IsRequired(false);
 
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.SubmittedByUser)
@@ -235,5 +254,122 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .WithOne(x => x.AttachmentConfig)
             .HasForeignKey<WorkflowNodeFieldAttachmentConfig>(x => x.WorkflowNodeFieldId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ============================================================
+        // LIBRARY FIELDS — reusable form fields
+        // ============================================================
+
+        modelBuilder.Entity<LibraryField>()
+            .HasKey(x => x.Id);
+
+        modelBuilder.Entity<LibraryField>()
+            .HasIndex(x => x.FieldKey)
+            .IsUnique();
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.FieldKey)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.Label)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.FieldType)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.Placeholder)
+            .HasMaxLength(300);
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.RegexPattern)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.RegexMessage)
+            .HasMaxLength(300);
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.ValidationType)
+            .HasMaxLength(50);
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.MinValue)
+            .HasPrecision(18, 2);
+
+        modelBuilder.Entity<LibraryField>()
+            .Property(x => x.MaxValue)
+            .HasPrecision(18, 2);
+
+        // ---- Attachment config (1:1) ----
+        modelBuilder.Entity<LibraryFieldAttachmentConfig>()
+            .HasKey(x => x.Id);
+
+        modelBuilder.Entity<LibraryFieldAttachmentConfig>()
+            .Property(x => x.AllowedFileTypesJson)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<LibraryFieldAttachmentConfig>()
+            .HasIndex(x => x.LibraryFieldId)
+            .IsUnique();
+
+        modelBuilder.Entity<LibraryFieldAttachmentConfig>()
+            .HasOne(x => x.LibraryField)
+            .WithOne(x => x.AttachmentConfig)
+            .HasForeignKey<LibraryFieldAttachmentConfig>(x => x.LibraryFieldId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ============================================================
+        // FORMS
+        // ============================================================
+
+        modelBuilder.Entity<Form>()
+            .HasKey(x => x.Id);
+
+        modelBuilder.Entity<Form>()
+            .HasIndex(x => new { x.FormKey, x.Version })
+            .IsUnique();
+
+        modelBuilder.Entity<Form>()
+            .Property(x => x.FormKey)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        modelBuilder.Entity<Form>()
+            .Property(x => x.Name)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        modelBuilder.Entity<Form>()
+            .Property(x => x.Description)
+            .HasMaxLength(1000);
+
+        modelBuilder.Entity<Form>()
+            .Property(x => x.Status)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        modelBuilder.Entity<FormField>()
+            .HasKey(x => x.Id);
+
+        modelBuilder.Entity<FormField>()
+            .Property(x => x.LabelOverride)
+            .HasMaxLength(200);
+
+        modelBuilder.Entity<FormField>()
+            .HasOne(x => x.Form)
+            .WithMany(x => x.Fields)
+            .HasForeignKey(x => x.FormId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FormField>()
+            .HasOne(x => x.LibraryField)
+            .WithMany()
+            .HasForeignKey(x => x.LibraryFieldId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

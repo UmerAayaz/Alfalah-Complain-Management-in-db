@@ -22,7 +22,6 @@ public sealed class WorkflowDefinition : EntityBase
 public sealed class WorkflowNode : EntityBase
 {
     public Guid WorkflowDefinitionId { get; set; }
-    public WorkflowDefinition WorkflowDefinition { get; set; } = null!;
     public string NodeKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public WorkflowNodeType Type { get; set; }
@@ -32,8 +31,8 @@ public sealed class WorkflowNode : EntityBase
     public decimal PositionX { get; set; }
     public decimal PositionY { get; set; }
     public string? ConfigJson { get; set; }
-    public ICollection<WorkflowNodeField> Fields { get; set; }
-    = new List<WorkflowNodeField>();
+    public Guid? FormId { get; set; }        // ← ye add karo
+    public ICollection<WorkflowNodeField> Fields { get; set; } = new List<WorkflowNodeField>();
 }
 
 public sealed class WorkflowTransition : EntityBase

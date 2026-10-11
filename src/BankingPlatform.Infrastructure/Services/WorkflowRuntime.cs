@@ -39,13 +39,22 @@ public sealed class SqlWorkflowRuntime(
         complaint.CurrentWorkflowInstanceId = instance.Id;
         complaint.Status = ComplaintStatus.InProgress;
 
-        var start = definition.Nodes.Single(x => x.Type == WorkflowNodeType.Start);
-        await MoveFromNodeAsync(instance, definition, start, outcomeKey: null, nextAssigneeUserId: null, actorUserId: complaint.CreatedByUserId, cancellationToken);
+        var start = definition.Nodes.FirstOrDefault(x => x.Type == WorkflowNodeType.Start)
+            ?? throw new InvalidOperationException(
+                $"Workflow '{definition.Name}' (v{definition.Version}) is missing its Start node. " +
+                "Please open the workflow designer, add a Start node, and re-publish.");
+
+        await MoveFromNodeAsync(
+            instance, definition, start,
+            outcomeKey: null, nextAssigneeUserId: null,
+            actorUserId: complaint.CreatedByUserId,
+            cancellationToken);
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
     // ============================================================
-    // COMPLETE TASK
+    // COMPLETE TASK — supports both form-based and inline fields
     // ============================================================
 
     public async Task CompleteTaskAsync(
@@ -58,6 +67,7 @@ public sealed class SqlWorkflowRuntime(
         var task = await db.WorkflowTasks
             .Include(x => x.WorkflowNode)
                 .ThenInclude(x => x.Fields)
+                    .ThenInclude(f => f.AttachmentConfig)
             .Include(x => x.WorkflowInstance)
                 .ThenInclude(x => x.WorkflowDefinition)
                     .ThenInclude(x => x.Nodes)
@@ -92,9 +102,47 @@ public sealed class SqlWorkflowRuntime(
                 throw new ArgumentException("Selected assignee does not exist or is inactive.");
         }
 
-        var fields = task.WorkflowNode.Fields
-            .OrderBy(x => x.DisplayOrder)
-            .ToList();
+        // ============================================================
+        // LOAD ATTACHED FORM (if any)
+        // ============================================================
+        Form? attachedForm = null;
+
+        if (task.WorkflowNode.FormId.HasValue)
+        {
+            attachedForm = await db.Forms
+                .Include(x => x.Fields)
+                    .ThenInclude(x => x.LibraryField)
+                        .ThenInclude(lf => lf.AttachmentConfig)
+                .FirstOrDefaultAsync(
+                    x => x.Id == task.WorkflowNode.FormId.Value,
+                    cancellationToken);
+        }
+
+        var isFormBased = attachedForm is not null && attachedForm.Fields.Count > 0;
+
+        // ============================================================
+        // UNIFIED FIELD LIST — either from form OR from node
+        // ============================================================
+        // Shape: Id, Label, FieldType, IsRequired
+        var unifiedFields = isFormBased
+            ? attachedForm!.Fields
+                .OrderBy(x => x.DisplayOrder)
+                .Select(ff => new UnifiedField(
+                    ff.LibraryFieldId,
+                    ff.LabelOverride ?? ff.LibraryField.Label,
+                    ff.LibraryField.FieldType,
+                    ff.IsRequiredOverride ?? ff.LibraryField.IsRequired))
+                .ToList()
+            : task.WorkflowNode.Fields
+                .OrderBy(x => x.DisplayOrder)
+                .Select(f => new UnifiedField(
+                    f.Id,
+                    f.Label,
+                    f.FieldType,
+                    f.IsRequired))
+                .ToList();
+
+        var validFieldIds = unifiedFields.Select(x => x.Id).ToHashSet();
 
         var suppliedAnswers = request.FieldAnswers ?? Array.Empty<WorkflowFieldAnswerRequest>();
 
@@ -102,41 +150,21 @@ public sealed class SqlWorkflowRuntime(
             .GroupBy(x => x.FieldId)
             .ToDictionary(x => x.Key, x => x.Last());
 
-        Console.WriteLine("=== FIELD ID DEBUG BACKEND ===");
-        foreach (var field in fields)
-        {
-            Console.WriteLine($"Backend Field: Id={field.Id}, Label={field.Label}, Type={field.FieldType}");
-        }
+        // ---- Validate submitted field IDs ----
         foreach (var answer in suppliedAnswers)
         {
-            Console.WriteLine($"Submitted Field: Id={answer.FieldId}");
-        }
-
-        foreach (var answer in suppliedAnswers)
-        {
-            if (fields.All(x => x.Id != answer.FieldId))
+            if (!validFieldIds.Contains(answer.FieldId))
             {
                 throw new ArgumentException(
                     "One of the submitted fields does not belong to this workflow step.");
             }
         }
 
-        Console.WriteLine("=== ATTACHMENT DEBUG ===");
-        Console.WriteLine($"Files count: {files?.Count ?? 0}");
-        if (files != null)
-        {
-            foreach (var file in files)
-            {
-                Console.WriteLine($"File: Name={file.Name}, FileName={file.FileName}, Size={file.Length}");
-            }
-        }
-
-        // --- Required-field validation (both attachment and normal) ---
-        foreach (var requiredField in fields.Where(x => x.IsRequired))
+        // ---- Required-field validation ----
+        foreach (var requiredField in unifiedFields.Where(x => x.IsRequired))
         {
             if (string.Equals(requiredField.FieldType, "attachment", StringComparison.OrdinalIgnoreCase))
             {
-                // Accept "files_<fieldId>" OR "files[<fieldId>]"
                 var hasFile = files?.Any(x =>
                     x.Length > 0 &&
                     (string.Equals(x.Name, $"files_{requiredField.Id}", StringComparison.OrdinalIgnoreCase) ||
@@ -156,8 +184,10 @@ public sealed class SqlWorkflowRuntime(
             }
         }
 
-        // --- Persist field responses + attachments ---
-        foreach (var field in fields)
+        // ============================================================
+        // PERSIST RESPONSES + ATTACHMENTS
+        // ============================================================
+        foreach (var field in unifiedFields)
         {
             answerLookup.TryGetValue(field.Id, out var answer);
 
@@ -170,11 +200,14 @@ public sealed class SqlWorkflowRuntime(
                 ComplaintId = task.ComplaintId,
                 WorkflowTaskId = task.Id,
                 WorkflowNodeId = task.WorkflowNodeId,
-                WorkflowNodeFieldId = field.Id,
                 SubmittedByUserId = actorUserId,
                 Label = field.Label,
                 ValueJson = valueJson,
-                SubmittedAtUtc = DateTime.UtcNow
+                SubmittedAtUtc = DateTime.UtcNow,
+
+                // Set the right FK depending on the source
+                WorkflowNodeFieldId = isFormBased ? null : field.Id,
+                LibraryFieldId = isFormBased ? field.Id : null,
             };
 
             db.WorkflowFieldResponses.Add(response);
@@ -190,16 +223,13 @@ public sealed class SqlWorkflowRuntime(
 
                 foreach (var file in fieldFiles)
                 {
-                    if (file.Length <= 0)
-                        continue;
+                    if (file.Length <= 0) continue;
 
-                    // Read file bytes into memory
                     using var ms = new MemoryStream();
                     await file.CopyToAsync(ms, cancellationToken);
                     var content = ms.ToArray();
 
-                    // SHA-256 for integrity
-                    string? hash = null;
+                    string? hash;
                     using (var sha = System.Security.Cryptography.SHA256.Create())
                     {
                         hash = Convert.ToHexString(sha.ComputeHash(content)).ToLowerInvariant();
@@ -223,6 +253,9 @@ public sealed class SqlWorkflowRuntime(
             }
         }
 
+        // ============================================================
+        // COMPLETE TASK
+        // ============================================================
         task.Status = WorkflowTaskStatus.Completed;
         task.CompletedAtUtc = DateTime.UtcNow;
         task.CompletedByUserId = actorUserId;
@@ -241,13 +274,9 @@ public sealed class SqlWorkflowRuntime(
         var definition = task.WorkflowInstance.WorkflowDefinition;
 
         await MoveFromNodeAsync(
-            task.WorkflowInstance,
-            definition,
-            task.WorkflowNode,
-            request.OutcomeKey,
-            request.NextAssigneeUserId,
-            actorUserId,
-            cancellationToken);
+            task.WorkflowInstance, definition, task.WorkflowNode,
+            request.OutcomeKey, request.NextAssigneeUserId,
+            actorUserId, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -287,7 +316,11 @@ public sealed class SqlWorkflowRuntime(
             throw new InvalidOperationException(
                 $"No transition matched outcome '{outcomeKey ?? "<default>"}' from node '{sourceNode.Name}'.");
 
-        var target = definition.Nodes.Single(x => x.Id == transition.TargetNodeId);
+        var target = definition.Nodes.FirstOrDefault(x => x.Id == transition.TargetNodeId)
+            ?? throw new InvalidOperationException(
+                $"Workflow '{definition.Name}' has a transition from '{sourceNode.Name}' " +
+                "pointing to a node that no longer exists. Please re-publish the workflow.");
+
         await EnterNodeAsync(instance, definition, target, nextAssigneeUserId, actorUserId, cancellationToken);
     }
 
@@ -406,4 +439,13 @@ public sealed class SqlWorkflowRuntime(
 
         return false;
     }
+
+    // ============================================================
+    // INTERNAL HELPER TYPE
+    // ============================================================
+    private sealed record UnifiedField(
+        Guid Id,
+        string Label,
+        string FieldType,
+        bool IsRequired);
 }

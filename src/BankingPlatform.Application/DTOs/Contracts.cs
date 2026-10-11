@@ -53,7 +53,8 @@ public sealed record WorkflowNodeRequest(
     decimal X,
     decimal Y,
     string? ConfigJson = null,
-    IReadOnlyList<WorkflowNodeFieldRequest>? Fields = null);
+    IReadOnlyList<WorkflowNodeFieldRequest>? Fields = null,
+    Guid? FormId = null);                    // ← ye add karo
 
 public sealed record WorkflowEdgeRequest(
     string SourceKey,
@@ -170,12 +171,16 @@ public sealed record WorkflowTaskFieldDto(
     bool IsRequired,
     int DisplayOrder,
     IReadOnlyList<string> Options,
-
-    // Attachment configuration — filled only when FieldType == "attachment"
     IReadOnlyList<string>? AllowedFileTypes = null,
     int? MaxFileSizeMb = null,
-    bool? AllowMultiple = null);
-
+    bool? AllowMultiple = null,
+    string? RegexPattern = null,
+    string? RegexMessage = null,
+    int? MinLength = null,
+    int? MaxLength = null,
+    decimal? MinValue = null,
+    decimal? MaxValue = null);
+    
 public sealed record PreviousWorkflowFieldDto(
     string FieldKey,
     string Label,
@@ -193,6 +198,8 @@ public sealed record PreviousWorkflowStepDto(
 public sealed record WorkflowTaskFormDto(
     Guid WorkflowTaskId,
     string NodeName,
+    Guid? FormId,
+    string? FormName,
     IReadOnlyList<WorkflowTaskFieldDto> CurrentFields,
     IReadOnlyList<PreviousWorkflowStepDto> PreviousSteps);
 
@@ -200,11 +207,6 @@ public sealed record WorkflowTaskFormDto(
 // FIELD ANSWER (frontend → backend)
 // ============================================================
 
-/// <summary>
-/// One answer for one dynamic field on a workflow task.
-/// Value is intentionally JsonElement? so it can carry strings, numbers, booleans,
-/// option codes, attachment IDs, etc. without DTO churn.
-/// </summary>
 public sealed record WorkflowFieldAnswerRequest(
     [property: JsonPropertyName("fieldId")] Guid FieldId,
     [property: JsonPropertyName("value")]   JsonElement? Value)

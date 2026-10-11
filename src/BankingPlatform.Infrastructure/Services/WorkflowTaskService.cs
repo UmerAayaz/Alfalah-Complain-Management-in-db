@@ -67,7 +67,9 @@ public sealed class WorkflowTaskService(
     // ACTIONS
     // ============================================================
 
-    public async Task<IReadOnlyList<WorkflowTaskActionDto>> GetActionsAsync(Guid taskId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkflowTaskActionDto>> GetActionsAsync(
+        Guid taskId,
+        CancellationToken cancellationToken)
     {
         var task = await db.WorkflowTasks.AsNoTracking()
             .Include(x => x.WorkflowNode)
@@ -105,7 +107,8 @@ public sealed class WorkflowTaskService(
 
         foreach (var transition in outgoing)
         {
-            var target = definition.Nodes.Single(x => x.Id == transition.TargetNodeId);
+            var target = definition.Nodes.FirstOrDefault(x => x.Id == transition.TargetNodeId);
+            if (target is null) continue;
 
             actions.Add(new WorkflowTaskActionDto(
                 transition.OutcomeKey,
@@ -123,7 +126,7 @@ public sealed class WorkflowTaskService(
     }
 
     // ============================================================
-    // FORM  (current fields + previous steps with attachments)
+    // FORM  (attached form OR inline fields)
     // ============================================================
 
     public async Task<WorkflowTaskFormDto> GetFormAsync(
@@ -159,25 +162,89 @@ public sealed class WorkflowTaskService(
             throw new UnauthorizedAccessException(
                 "This task is not assigned to you or your role queue.");
 
-        // ---- CURRENT FIELDS (with attachment config) ----
-        var currentFields = task.WorkflowNode.Fields
-            .OrderBy(x => x.DisplayOrder)
-            .Select(field => new WorkflowTaskFieldDto(
-                field.Id,
-                field.FieldKey,
-                field.Label,
-                field.FieldType,
-                field.Placeholder,
-                field.IsRequired,
-                field.DisplayOrder,
-                ParseOptions(field.OptionsJson),
-                field.AttachmentConfig is null
-                    ? null
-                    : ParseAllowedFileTypes(field.AttachmentConfig.AllowedFileTypesJson),
-                field.AttachmentConfig?.MaxFileSizeMb,
-                field.AttachmentConfig?.AllowMultiple))
-            .ToList();
+        // ============================================================
+        // LOAD ATTACHED FORM (if any)
+        // ============================================================
+        Form? attachedForm = null;
 
+        if (task.WorkflowNode.FormId.HasValue)
+        {
+            attachedForm = await db.Forms
+                .AsNoTracking()
+                .Include(x => x.Fields)
+                    .ThenInclude(x => x.LibraryField)
+                        .ThenInclude(lf => lf.AttachmentConfig)
+                .FirstOrDefaultAsync(
+                    x => x.Id == task.WorkflowNode.FormId.Value,
+                    cancellationToken);
+        }
+
+        // ============================================================
+        // CURRENT FIELDS — form fields if attached, else inline
+        // ============================================================
+        List<WorkflowTaskFieldDto> currentFields;
+
+        if (attachedForm is not null && attachedForm.Fields.Count > 0)
+        {
+            currentFields = attachedForm.Fields
+                .OrderBy(x => x.DisplayOrder)
+                .Select(ff =>
+                {
+                    var lf = ff.LibraryField;
+
+                    return new WorkflowTaskFieldDto(
+                        lf.Id,
+                        lf.FieldKey,
+                        ff.LabelOverride ?? lf.Label,
+                        lf.FieldType,
+                        lf.Placeholder,
+                        ff.IsRequiredOverride ?? lf.IsRequired,
+                        ff.DisplayOrder,
+                        ParseOptions(lf.OptionsJson),
+                        lf.AttachmentConfig is null
+                            ? null
+                            : ParseAllowedFileTypes(lf.AttachmentConfig.AllowedFileTypesJson),
+                        lf.AttachmentConfig?.MaxFileSizeMb,
+                        lf.AttachmentConfig?.AllowMultiple,
+                        lf.RegexPattern,
+                        lf.RegexMessage,
+                        lf.MinLength,
+                        lf.MaxLength,
+                        lf.MinValue,
+                        lf.MaxValue);
+                })
+                .ToList();
+        }
+        else
+        {
+            currentFields = task.WorkflowNode.Fields
+                .OrderBy(x => x.DisplayOrder)
+                .Select(field => new WorkflowTaskFieldDto(
+                    field.Id,
+                    field.FieldKey,
+                    field.Label,
+                    field.FieldType,
+                    field.Placeholder,
+                    field.IsRequired,
+                    field.DisplayOrder,
+                    ParseOptions(field.OptionsJson),
+                    field.AttachmentConfig is null
+                        ? null
+                        : ParseAllowedFileTypes(field.AttachmentConfig.AllowedFileTypesJson),
+                    field.AttachmentConfig?.MaxFileSizeMb,
+                    field.AttachmentConfig?.AllowMultiple,
+                    null,   // RegexPattern — inline fields ke liye null
+                    null,   // RegexMessage
+                    null,   // MinLength
+                    null,   // MaxLength
+                    null,   // MinValue
+                    null))  // MaxValue
+                .ToList();
+        }
+
+        // ============================================================
+        // PREVIOUS STEPS
+        // ============================================================
         var completedTasks = await db.WorkflowTasks
             .AsNoTracking()
             .Include(x => x.WorkflowNode)
@@ -202,23 +269,23 @@ public sealed class WorkflowTaskService(
         var responses = await db.WorkflowFieldResponses
             .AsNoTracking()
             .Include(x => x.WorkflowNodeField)
+            .Include(x => x.LibraryField)
             .Where(x => completedTaskIds.Contains(x.WorkflowTaskId))
             .ToListAsync(cancellationToken);
 
-        // --- Load attachments for these responses in one query ---
         var responseIds = responses.Select(r => r.Id).ToList();
 
         var attachments = await db.WorkflowFieldAttachments
             .AsNoTracking()
             .Where(a => responseIds.Contains(a.WorkflowFieldResponseId))
-           .Select(a => new
-{
-    a.Id,
-    a.WorkflowFieldResponseId,
-    a.FileName,
-    a.ContentType,
-    a.FileSize,          
-})
+            .Select(a => new
+            {
+                a.Id,
+                a.WorkflowFieldResponseId,
+                a.FileName,
+                a.ContentType,
+                a.FileSize,
+            })
             .ToListAsync(cancellationToken);
 
         var attachmentsByResponseId = attachments
@@ -230,10 +297,23 @@ public sealed class WorkflowTaskService(
             {
                 var taskResponses = responses
                     .Where(x => x.WorkflowTaskId == previousTask.Id)
-                    .OrderBy(x => x.WorkflowNodeField.DisplayOrder)
+                    .OrderBy(x => x.WorkflowNodeField != null
+                        ? x.WorkflowNodeField.DisplayOrder
+                        : 0)
                     .Select(response =>
                     {
-                        var fieldType = response.WorkflowNodeField.FieldType;
+                        var fieldType = response.WorkflowNodeField?.FieldType
+                            ?? response.LibraryField?.FieldType
+                            ?? "text";
+
+                        var fieldKey = response.WorkflowNodeField?.FieldKey
+                            ?? response.LibraryField?.FieldKey
+                            ?? "";
+
+                        var label = response.WorkflowNodeField?.Label
+                            ?? response.LibraryField?.Label
+                            ?? response.Label
+                            ?? "";
 
                         object? value;
 
@@ -261,8 +341,8 @@ public sealed class WorkflowTaskService(
                         }
 
                         return new PreviousWorkflowFieldDto(
-                            response.WorkflowNodeField.FieldKey,
-                            response.WorkflowNodeField.Label,
+                            fieldKey,
+                            label,
                             fieldType,
                             value);
                     })
@@ -288,6 +368,8 @@ public sealed class WorkflowTaskService(
         return new WorkflowTaskFormDto(
             task.Id,
             task.WorkflowNode.Name,
+            attachedForm?.Id,
+            attachedForm?.Name,
             currentFields,
             previousSteps);
     }
@@ -312,7 +394,10 @@ public sealed class WorkflowTaskService(
     // REASSIGN
     // ============================================================
 
-    public async Task ReassignAsync(Guid taskId, ReassignWorkflowTaskRequest request, CancellationToken cancellationToken)
+    public async Task ReassignAsync(
+        Guid taskId,
+        ReassignWorkflowTaskRequest request,
+        CancellationToken cancellationToken)
     {
         var task = await db.WorkflowTasks
             .Include(x => x.WorkflowNode)
@@ -418,10 +503,6 @@ public sealed class WorkflowTaskService(
             return json;
         }
     }
-
-    // ============================================================
-    // Attachment config JSON parser
-    // ============================================================
 
     private static IReadOnlyList<string>? ParseAllowedFileTypes(string? json)
     {

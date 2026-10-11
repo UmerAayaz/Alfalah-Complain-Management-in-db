@@ -119,7 +119,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         db.WorkflowDefinitions.Attach(fresh);
         db.Entry(fresh).State = EntityState.Unchanged;
 
-        // Ensure nav collections are empty (they are, since no-tracking)
         fresh.Nodes.Clear();
         fresh.Transitions.Clear();
 
@@ -131,6 +130,10 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
         return Map(fresh);
     }
+
+    // ============================================================
+    // PUBLISH — with validation
+    // ============================================================
 
     public async Task<WorkflowDefinitionDto> PublishAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -144,6 +147,109 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
         if (definition.Status != WorkflowDefinitionStatus.Draft)
             throw new InvalidOperationException("Only draft workflows can be published.");
+
+        // ============================================================
+        // VALIDATE BEFORE PUBLISHING
+        // ============================================================
+
+        var startCount = definition.Nodes.Count(x => x.Type == WorkflowNodeType.Start);
+        if (startCount != 1)
+            throw new InvalidOperationException(
+                $"Cannot publish: workflow must have exactly 1 Start node (found {startCount}).");
+
+        var endCount = definition.Nodes.Count(x => x.Type == WorkflowNodeType.End);
+        if (endCount < 1)
+            throw new InvalidOperationException(
+                "Cannot publish: workflow must have at least 1 End node.");
+
+        if (definition.Nodes.Count < 2)
+            throw new InvalidOperationException(
+                "Cannot publish: workflow must have at least Start and End nodes.");
+
+        // Validate transitions point to real nodes
+        var nodeIds = definition.Nodes.Select(x => x.Id).ToHashSet();
+        foreach (var t in definition.Transitions)
+        {
+            if (!nodeIds.Contains(t.SourceNodeId))
+                throw new InvalidOperationException(
+                    "Cannot publish: a transition references a missing source node.");
+
+            if (!nodeIds.Contains(t.TargetNodeId))
+                throw new InvalidOperationException(
+                    "Cannot publish: a transition references a missing target node.");
+        }
+
+        // Validate attached forms are Published
+                // Validate attached forms are Published
+        var attachedFormIds = definition.Nodes
+            .Where(x => x.FormId.HasValue)
+            .Select(x => x.FormId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (attachedFormIds.Count > 0)
+        {
+            var unpublishedCount = await db.Forms
+                .Where(f => attachedFormIds.Contains(f.Id) && f.Status != "Published")
+                .CountAsync(cancellationToken);
+
+            if (unpublishedCount > 0)
+                throw new InvalidOperationException(
+                    $"Cannot publish: {unpublishedCount} attached form(s) are not Published. " +
+                    "Please publish the forms first, or detach them from this workflow.");
+        }
+        // Validate every node is reachable from Start
+                // Validate attached forms are Published
+        var formIds = definition.Nodes
+            .Where(x => x.FormId.HasValue)
+            .Select(x => x.FormId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (formIds.Count > 0)
+        {
+            var unpublishedCount = await db.Forms
+                .Where(f => formIds.Contains(f.Id) && f.Status != "Published")
+                .CountAsync(cancellationToken);
+
+            if (unpublishedCount > 0)
+                throw new InvalidOperationException(
+                    $"Cannot publish: {unpublishedCount} attached form(s) are not Published. " +
+                    "Publish the forms first, or detach them from this workflow.");
+        }
+
+        // Validate every node is reachable from Start
+        var startNode = definition.Nodes.First(x => x.Type == WorkflowNodeType.Start);
+        var visited = new HashSet<Guid> { startNode.Id };
+        var queue = new Queue<Guid>();
+        queue.Enqueue(startNode.Id);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var outgoing = definition.Transitions
+                .Where(t => t.SourceNodeId == current)
+                .Select(t => t.TargetNodeId);
+
+            foreach (var next in outgoing)
+            {
+                if (visited.Add(next))
+                    queue.Enqueue(next);
+            }
+        }
+
+        var unreachable = definition.Nodes
+            .Where(n => !visited.Contains(n.Id))
+            .Select(n => n.Name)
+            .ToList();
+
+        if (unreachable.Count > 0)
+            throw new InvalidOperationException(
+                "Cannot publish: unreachable nodes — " + string.Join(", ", unreachable));
+
+        // ============================================================
+        // ARCHIVE OLD + PUBLISH
+        // ============================================================
 
         var oldPublished = await db.WorkflowDefinitions
             .Where(x => x.CategoryId == definition.CategoryId && x.Status == WorkflowDefinitionStatus.Published)
@@ -240,6 +346,7 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         // ---------------------------------------------------------
         foreach (var item in request.Nodes)
         {
+            // ✅ FIXED: node is now created (was commented out)
             var node = new WorkflowNode
             {
                 WorkflowDefinitionId = definition.Id,
@@ -247,6 +354,7 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 Name = item.Name.Trim(),
                 Type = item.Type,
                 RoleCode = item.RoleCode?.Trim(),
+                FormId = item.FormId,
                 SlaHours = item.SlaHours,
                 EscalationRoleCode = item.EscalationRoleCode?.Trim(),
                 PositionX = item.X,

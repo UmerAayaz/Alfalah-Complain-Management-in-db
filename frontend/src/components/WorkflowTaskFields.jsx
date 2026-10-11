@@ -1,33 +1,17 @@
+import { useMemo, useState } from 'react'
+
+// ============================================================
+// HELPERS
+// ============================================================
+
 function displayValue(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ''
-  ) {
-    return '—'
-  }
-
-  if (Array.isArray(value)) {
-    return value.join(', ')
-  }
-
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No'
-  }
-
-  if (typeof value === 'object') {
-    return JSON.stringify(value)
-  }
-
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
 
-/*
- * A previous-step value for an attachment field arrives from the API as
- * something like:
- *   { attachmentId: "...", fileName: "...", contentType: "..." }
- * or an array of those. This detects that shape.
- */
 function asAttachments(value) {
   if (!value) return []
   if (Array.isArray(value)) {
@@ -35,9 +19,7 @@ function asAttachments(value) {
       (v) => v && typeof v === 'object' && v.attachmentId
     )
   }
-  if (typeof value === 'object' && value.attachmentId) {
-    return [value]
-  }
+  if (typeof value === 'object' && value.attachmentId) return [value]
   return []
 }
 
@@ -48,6 +30,66 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
+// ============================================================
+// VALIDATION FUNCTION
+// ============================================================
+function validateField(field, value) {
+  const empty =
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0)
+
+  // Required check (skip attachment — handled separately)
+  if (
+    field.isRequired &&
+    field.fieldType !== 'attachment' &&
+    empty
+  ) {
+    return 'This field is required'
+  }
+
+  if (empty) return ''
+
+  // Length checks (strings only)
+  if (typeof value === 'string') {
+    if (field.minLength != null && value.length < field.minLength) {
+      return `Minimum ${field.minLength} characters`
+    }
+    if (field.maxLength != null && value.length > field.maxLength) {
+      return `Maximum ${field.maxLength} characters`
+    }
+  }
+
+  // Number range
+  if (field.fieldType === 'number') {
+    const num = Number(value)
+    if (field.minValue != null && num < field.minValue) {
+      return `Minimum value is ${field.minValue}`
+    }
+    if (field.maxValue != null && num > field.maxValue) {
+      return `Maximum value is ${field.maxValue}`
+    }
+  }
+
+  // Regex check
+  if (field.regexPattern && typeof value === 'string') {
+    try {
+      const regex = new RegExp(field.regexPattern)
+      if (!regex.test(value)) {
+        return field.regexMessage || 'Invalid format'
+      }
+    } catch (e) {
+      // invalid regex on backend — skip
+    }
+  }
+
+  return ''
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
 export default function WorkflowTaskFields({
   form,
   values,
@@ -55,11 +97,21 @@ export default function WorkflowTaskFields({
 }) {
   if (!form) return null
 
+  // Track validation errors per field
+  const [errors, setErrors] = useState({})
+
   const setValue = (fieldId, value) => {
     onChange({
       ...values,
       [fieldId]: value,
     })
+
+    // Validate on change
+    const field = form.currentFields?.find((f) => f.id === fieldId)
+    if (field) {
+      const err = validateField(field, value)
+      setErrors((prev) => ({ ...prev, [fieldId]: err }))
+    }
   }
 
   return (
@@ -104,11 +156,9 @@ export default function WorkflowTaskFields({
                           key={att.attachmentId}
                         >
                           <span className="attachment-check">✓</span>
-
                           <span className="attachment-name">
                             {att.fileName}
                           </span>
-
                           <a
                             className="view-btn"
                             href={`/api/workflow-tasks/attachments/${att.attachmentId}/view`}
@@ -117,7 +167,6 @@ export default function WorkflowTaskFields({
                           >
                             View
                           </a>
-
                           <a
                             className="download-btn"
                             href={`/api/workflow-tasks/attachments/${att.attachmentId}/download`}
@@ -128,11 +177,7 @@ export default function WorkflowTaskFields({
                       ))}
                     </div>
                   ) : (
-                    <input
-                      className="input"
-                      value="—"
-                      readOnly
-                    />
+                    <input className="input" value="—" readOnly />
                   )
                 ) : (
                   <input
@@ -158,26 +203,22 @@ export default function WorkflowTaskFields({
 
           {form.currentFields.map((field) => {
             const value = values[field.id] ?? ''
+            const error = errors[field.id] || ''
+            const hasError = !!error
 
-            /*
-             * ATTACHMENT FIELD
-             */
+            /* ============================================================
+               ATTACHMENT
+            ============================================================ */
             if (field.fieldType === 'attachment') {
-              const acceptTypes = (
-                field.allowedFileTypes || []
-              )
+              const acceptTypes = (field.allowedFileTypes || [])
                 .flatMap((type) => {
                   switch (type.toLowerCase()) {
-                    case 'pdf':
-                      return ['.pdf']
-                    case 'jpg':
-                      return ['.jpg', '.jpeg']
-                    case 'png':
-                      return ['.png']
-                    case 'docx':
-                      return ['.docx']
-                    default:
-                      return []
+                    case 'pdf': return ['.pdf']
+                    case 'jpg': return ['.jpg', '.jpeg']
+                    case 'jpeg': return ['.jpg', '.jpeg']
+                    case 'png': return ['.png']
+                    case 'docx': return ['.docx']
+                    default: return [`.${type}`]
                   }
                 })
                 .join(',')
@@ -191,13 +232,8 @@ export default function WorkflowTaskFields({
               const inputId = `file-${field.id}`
 
               const handleFilesChosen = (event) => {
-                const incoming = Array.from(
-                  event.target.files || []
-                )
-
-                const maxSizeMb = Number(
-                  field.maxFileSizeMb || 5
-                )
+                const incoming = Array.from(event.target.files || [])
+                const maxSizeMb = Number(field.maxFileSizeMb || 5)
                 const maxSizeBytes = maxSizeMb * 1024 * 1024
 
                 const valid = []
@@ -210,9 +246,7 @@ export default function WorkflowTaskFields({
 
                 if (invalid.length > 0) {
                   window.alert(
-                    `These files exceed the maximum size of ${maxSizeMb} MB:\n\n${invalid.join(
-                      '\n'
-                    )}`
+                    `These files exceed max size of ${maxSizeMb} MB:\n\n${invalid.join('\n')}`
                   )
                 }
 
@@ -220,17 +254,13 @@ export default function WorkflowTaskFields({
                   const merged = [...selectedFiles]
                   valid.forEach((f) => {
                     const dup = merged.some(
-                      (m) =>
-                        m.name === f.name && m.size === f.size
+                      (m) => m.name === f.name && m.size === f.size
                     )
                     if (!dup) merged.push(f)
                   })
                   setValue(field.id, merged)
                 } else {
-                  setValue(
-                    field.id,
-                    valid.length > 0 ? [valid[0]] : []
-                  )
+                  setValue(field.id, valid.length > 0 ? [valid[0]] : [])
                 }
 
                 event.target.value = ''
@@ -252,7 +282,6 @@ export default function WorkflowTaskFields({
                     {field.isRequired ? ' *' : ''}
                   </span>
 
-                  {/* hidden real input */}
                   <input
                     id={inputId}
                     type="file"
@@ -262,27 +291,18 @@ export default function WorkflowTaskFields({
                     onChange={handleFilesChosen}
                   />
 
-                  {/* visible trigger */}
                   <div className="attachment-option">
                     <label
                       htmlFor={inputId}
-                      className={`btn ${
-                        hasFiles
-                          ? 'btn-success'
-                          : 'btn-secondary'
-                      }`}
+                      className={`btn ${hasFiles ? 'btn-success' : 'btn-secondary'}`}
                     >
-                      {hasFiles
-                        ? '✓ Change file'
-                        : 'Choose file'}
+                      {hasFiles ? '✓ Change file' : 'Choose file'}
                     </label>
 
                     <small className="muted-text">
                       Allowed:{' '}
                       {field.allowedFileTypes?.length > 0
-                        ? field.allowedFileTypes
-                            .join(', ')
-                            .toUpperCase()
+                        ? field.allowedFileTypes.join(', ').toUpperCase()
                         : 'any file type'}
                       {' • '}
                       Max: {field.maxFileSizeMb || 5} MB
@@ -292,15 +312,12 @@ export default function WorkflowTaskFields({
                     </small>
                   </div>
 
-                  {/* Confirmation banner */}
                   {hasFiles && (
                     <div className="attachment-banner">
-                      ✓ File{selectedFiles.length > 1 ? 's' : ''}{' '}
-                      attached successfully
+                      ✓ File{selectedFiles.length > 1 ? 's' : ''} attached
                     </div>
                   )}
 
-                  {/* Selected files list */}
                   {hasFiles ? (
                     <div className="attachment-list">
                       {selectedFiles.map((file, index) => (
@@ -308,10 +325,7 @@ export default function WorkflowTaskFields({
                           className="attachment-row"
                           key={`${file.name}-${index}`}
                         >
-                          <span className="attachment-check">
-                            ✓
-                          </span>
-
+                          <span className="attachment-check">✓</span>
                           <span className="attachment-name">
                             {file.name}
                             <span className="attachment-size">
@@ -319,7 +333,6 @@ export default function WorkflowTaskFields({
                               ({formatFileSize(file.size)})
                             </span>
                           </span>
-
                           <a
                             className="view-btn"
                             href={URL.createObjectURL(file)}
@@ -328,7 +341,6 @@ export default function WorkflowTaskFields({
                           >
                             Preview
                           </a>
-
                           <button
                             type="button"
                             className="link-btn"
@@ -348,9 +360,9 @@ export default function WorkflowTaskFields({
               )
             }
 
-            /*
-             * TEXTAREA
-             */
+            /* ============================================================
+               TEXTAREA
+            ============================================================ */
             if (field.fieldType === 'textarea') {
               return (
                 <label className="field" key={field.id}>
@@ -360,20 +372,24 @@ export default function WorkflowTaskFields({
                   </span>
 
                   <textarea
-                    className="input textarea"
+                    className={`input textarea ${hasError ? 'input-error' : ''}`}
                     value={value}
                     placeholder={field.placeholder || ''}
-                    onChange={(event) =>
-                      setValue(field.id, event.target.value)
+                    onChange={(e) =>
+                      setValue(field.id, e.target.value)
                     }
                   />
+
+                  {hasError && (
+                    <div className="field-error">⚠ {error}</div>
+                  )}
                 </label>
               )
             }
 
-            /*
-             * DROPDOWN / RADIO
-             */
+            /* ============================================================
+               DROPDOWN / RADIO
+            ============================================================ */
             if (
               field.fieldType === 'dropdown' ||
               field.fieldType === 'radio'
@@ -386,50 +402,49 @@ export default function WorkflowTaskFields({
                   </span>
 
                   <select
-                    className="input"
+                    className={`input ${hasError ? 'input-error' : ''}`}
                     value={value}
-                    onChange={(event) =>
-                      setValue(field.id, event.target.value)
+                    onChange={(e) =>
+                      setValue(field.id, e.target.value)
                     }
                   >
                     <option value="">Select...</option>
-
                     {(field.options || []).map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
                     ))}
                   </select>
+
+                  {hasError && (
+                    <div className="field-error">⚠ {error}</div>
+                  )}
                 </label>
               )
             }
 
-            /*
-             * CHECKBOX
-             */
+            /* ============================================================
+               CHECKBOX
+            ============================================================ */
             if (field.fieldType === 'checkbox') {
               return (
-                <label
-                  className="checkbox-field"
-                  key={field.id}
-                >
+                <label className="checkbox-field" key={field.id}>
                   <input
                     type="checkbox"
                     checked={!!value}
-                    onChange={(event) =>
-                      setValue(field.id, event.target.checked)
+                    onChange={(e) =>
+                      setValue(field.id, e.target.checked)
                     }
                   />
-
                   {field.label}
                   {field.isRequired ? ' *' : ''}
                 </label>
               )
             }
 
-            /*
-             * TEXT / NUMBER / DATE
-             */
+            /* ============================================================
+               TEXT / NUMBER / DATE (with regex validation)
+            ============================================================ */
             return (
               <label className="field" key={field.id}>
                 <span>
@@ -438,7 +453,7 @@ export default function WorkflowTaskFields({
                 </span>
 
                 <input
-                  className="input"
+                  className={`input ${hasError ? 'input-error' : ''}`}
                   type={
                     field.fieldType === 'number'
                       ? 'number'
@@ -448,10 +463,20 @@ export default function WorkflowTaskFields({
                   }
                   value={value}
                   placeholder={field.placeholder || ''}
-                  onChange={(event) =>
-                    setValue(field.id, event.target.value)
+                  onChange={(e) =>
+                    setValue(field.id, e.target.value)
                   }
                 />
+
+                {hasError && (
+                  <div className="field-error">⚠ {error}</div>
+                )}
+
+                {!hasError && field.regexMessage && value && (
+                  <small className="field-hint">
+                    Format: {field.regexMessage}
+                  </small>
+                )}
               </label>
             )
           })}
