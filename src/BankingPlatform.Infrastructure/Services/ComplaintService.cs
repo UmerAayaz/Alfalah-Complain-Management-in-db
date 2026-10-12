@@ -4,80 +4,82 @@ using BankingPlatform.Domain.Entities;
 using BankingPlatform.Domain.Enums;
 using BankingPlatform.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
 
 namespace BankingPlatform.Infrastructure.Services;
 
 public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, IWorkflowRuntime workflowRuntime) : IComplaintService
 {
-   public async Task<ComplaintDetailsDto> CreateAsync(
-    CreateComplaintRequest request,
-    CancellationToken cancellationToken)
-{
-    var category = await db.ComplaintCategories
-        .AsNoTracking()
-        .FirstOrDefaultAsync(
-            x => x.Id == request.CategoryId && x.IsActive,
-            cancellationToken)
-        ?? throw new ArgumentException(
-            "Complaint category not found or inactive.");
-
-    var userExists = await db.Users.AnyAsync(
-        x => x.Id == currentUser.UserId && x.IsActive,
-        cancellationToken);
-
-    if (!userExists)
-        throw new UnauthorizedAccessException(
-            "Current user is not registered.");
-
-    var complaint = new Complaint
+    public async Task<ComplaintDetailsDto> CreateAsync(
+        CreateComplaintRequest request,
+        CancellationToken cancellationToken)
     {
-        ComplaintNumber =
-            $"CMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+        var category = await db.ComplaintCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == request.CategoryId && x.IsActive,
+                cancellationToken)
+            ?? throw new ArgumentException(
+                "Complaint category not found or inactive.");
 
-        CategoryId = request.CategoryId,
+        var userExists = await db.Users.AnyAsync(
+            x => x.Id == currentUser.UserId && x.IsActive,
+            cancellationToken);
 
-        Subject = request.Subject.Trim(),
+        if (!userExists)
+            throw new UnauthorizedAccessException(
+                "Current user is not registered.");
 
-        Description = request.Description.Trim(),
+        var complaint = new Complaint
+        {
+            ComplaintNumber =
+                $"CMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
 
-        CustomerReference =
-            request.CustomerReference?.Trim(),
+            CategoryId = request.CategoryId,
 
-        Priority = request.Priority,
+            Subject = request.Subject.Trim(),
 
-        Status = ComplaintStatus.Open,
+            Description = request.Description.Trim(),
 
-        CreatedByUserId = currentUser.UserId
-    };
+            CustomerReference =
+                request.CustomerReference?.Trim(),
 
-    db.Complaints.Add(complaint);
+            Priority = request.Priority,
 
-    db.ComplaintEvents.Add(new ComplaintEvent
-    {
-        ComplaintId = complaint.Id,
+            Status = ComplaintStatus.Open,
 
-        ActorUserId = currentUser.UserId,
+            CreatedByUserId = currentUser.UserId
+        };
 
-        EventType = "ComplaintCreated",
+        db.Complaints.Add(complaint);
 
-        Message =
-            $"Complaint logged under category '{category.Name}'."
-    });
+        db.ComplaintEvents.Add(new ComplaintEvent
+        {
+            ComplaintId = complaint.Id,
 
-    // PHASE 1
-    // Persist Complaint first.
-    await db.SaveChangesAsync(cancellationToken);
+            ActorUserId = currentUser.UserId,
 
-    // PHASE 2
-    // Create WorkflowInstance after Complaint exists.
-    await workflowRuntime.StartAsync(
-        complaint,
-        cancellationToken);
+            EventType = "ComplaintCreated",
 
-    return (await GetAsync(
-        complaint.Id,
-        cancellationToken))!;
-}
+            Message =
+                $"Complaint logged under category '{category.Name}'."
+        });
+
+        // PHASE 1
+        // Persist Complaint first.
+        await db.SaveChangesAsync(cancellationToken);
+
+        // PHASE 2
+        // Create WorkflowInstance after Complaint exists.
+        await workflowRuntime.StartAsync(
+            complaint,
+            cancellationToken);
+
+        return (await GetAsync(
+            complaint.Id,
+            cancellationToken))!;
+    }
+
     public async Task<ComplaintDetailsDto?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var complaint = await db.Complaints.AsNoTracking()
@@ -120,4 +122,99 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
             .Select(x => new ComplaintListItemDto(x.Id, x.ComplaintNumber, x.Category.Name, x.Subject, x.Status, x.Priority, x.CreatedAtUtc))
             .ToListAsync(cancellationToken);
     }
+
+    // ============================================================
+    // ATTACHMENTS
+    // ============================================================
+
+    public async Task<IReadOnlyList<ComplaintAttachmentDto>> UploadAttachmentsAsync(
+        Guid complaintId,
+        IReadOnlyList<UploadAttachmentInput> files,
+        CancellationToken cancellationToken)
+    {
+        var exists = await db.Complaints
+            .AnyAsync(x => x.Id == complaintId, cancellationToken);
+
+        if (!exists)
+            throw new ArgumentException("Complaint not found.");
+
+        var saved = new List<ComplaintAttachment>();
+
+        foreach (var f in files)
+        {
+            using var ms = new MemoryStream();
+            await f.Content.CopyToAsync(ms, cancellationToken);
+
+            var attachment = new ComplaintAttachment
+            {
+                Id = Guid.NewGuid(),
+                ComplaintId = complaintId,
+                FileName = Path.GetFileName(f.FileName),
+                ContentType = string.IsNullOrWhiteSpace(f.ContentType)
+                    ? "application/octet-stream"
+                    : f.ContentType,
+                SizeBytes = ms.Length,
+                Content = ms.ToArray(),
+                UploadedByUserId = currentUser.UserId.ToString(),
+                UploadedAtUtc = DateTime.UtcNow
+            };
+
+            db.ComplaintAttachments.Add(attachment);
+            saved.Add(attachment);
+        }
+
+        db.ComplaintEvents.Add(new ComplaintEvent
+        {
+            ComplaintId = complaintId,
+            ActorUserId = currentUser.UserId,
+            EventType = "AttachmentsUploaded",
+            Message = $"{saved.Count} attachment(s) uploaded."
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return saved.Select(ToAttachmentDto).ToList();
+    }
+
+    public async Task<IReadOnlyList<ComplaintAttachmentDto>> GetAttachmentsAsync(
+        Guid complaintId,
+        CancellationToken cancellationToken)
+    {
+        return await db.ComplaintAttachments
+            .AsNoTracking()
+            .Where(x => x.ComplaintId == complaintId)
+            .OrderByDescending(x => x.UploadedAtUtc)
+            .Select(x => new ComplaintAttachmentDto(
+                x.Id,
+                x.ComplaintId,
+                x.FileName,
+                x.ContentType,
+                x.SizeBytes,
+                x.UploadedByUserId,
+                x.UploadedAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<(byte[] Content, string FileName, string ContentType)?> DownloadAttachmentAsync(
+        Guid attachmentId,
+        CancellationToken cancellationToken)
+    {
+        var a = await db.ComplaintAttachments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == attachmentId, cancellationToken);
+
+        if (a is null) return null;
+
+        return (a.Content, a.FileName, a.ContentType);
+    }
+
+    private static ComplaintAttachmentDto ToAttachmentDto(ComplaintAttachment x) =>
+        new(
+            x.Id,
+            x.ComplaintId,
+            x.FileName,
+            x.ContentType,
+            x.SizeBytes,
+            x.UploadedByUserId,
+            x.UploadedAtUtc);
 }

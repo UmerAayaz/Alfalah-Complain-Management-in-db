@@ -24,6 +24,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<LibraryFieldAttachmentConfig> LibraryFieldAttachmentConfigs => Set<LibraryFieldAttachmentConfig>();
     public DbSet<Form> Forms => Set<Form>();
     public DbSet<FormField> FormFields => Set<FormField>();
+    public DbSet<ComplaintAttachment> ComplaintAttachments => Set<ComplaintAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -371,5 +372,36 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .WithMany()
             .HasForeignKey(x => x.LibraryFieldId)
             .OnDelete(DeleteBehavior.Restrict);
+
+            // ============================================================
+// COMPLAINT ATTACHMENT — DB-only storage
+// ============================================================
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .HasKey(x => x.Id);
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .Property(x => x.FileName)
+    .HasMaxLength(255)
+    .IsRequired();
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .Property(x => x.ContentType)
+    .HasMaxLength(150)
+    .IsRequired();
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .Property(x => x.Content)
+    .HasColumnType("varbinary(max)")
+    .IsRequired();
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .HasIndex(x => x.ComplaintId);
+
+modelBuilder.Entity<ComplaintAttachment>()
+    .HasOne<Complaint>()
+    .WithMany()
+    .HasForeignKey(x => x.ComplaintId)
+    .OnDelete(DeleteBehavior.Cascade);
     }
 }

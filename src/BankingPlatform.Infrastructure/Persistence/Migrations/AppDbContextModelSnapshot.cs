@@ -119,6 +119,51 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("Complaints");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.ComplaintAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ComplaintId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("FieldId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UploadedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("WorkflowTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComplaintId");
+
+                    b.ToTable("ComplaintAttachments");
+                });
+
             modelBuilder.Entity("BankingPlatform.Domain.Entities.ComplaintCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -911,6 +956,15 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("CurrentWorkflowInstance");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.ComplaintAttachment", b =>
+                {
+                    b.HasOne("BankingPlatform.Domain.Entities.Complaint", null)
+                        .WithMany()
+                        .HasForeignKey("ComplaintId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.ComplaintCategory", b =>

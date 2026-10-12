@@ -158,6 +158,22 @@ public sealed record CurrentUserDto(
     string Email,
     IReadOnlyList<CurrentUserMembershipDto> Memberships);
 
+    
+public sealed record ComplaintAttachmentDto(
+    Guid Id,
+    Guid ComplaintId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string? UploadedByUserId,
+    DateTime UploadedAtUtc);
+
+public sealed record UploadAttachmentInput(
+    Stream Content,
+    string FileName,
+    string ContentType,
+    long SizeBytes);
+
 // ============================================================
 // WORKFLOW TASK FORM (entity → frontend)
 // ============================================================

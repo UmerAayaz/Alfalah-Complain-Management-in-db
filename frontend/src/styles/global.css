@@ -1034,3 +1034,161 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border-color: #dc2626;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
+
+/* ============================================================
+   ATTACHMENT UI
+   ============================================================ */
+
+.attachment-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.attachment-option .btn-success,
+.attachment-option .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1.5px solid transparent;
+  user-select: none;
+}
+
+.attachment-option .btn-success {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
+}
+
+.attachment-option .btn-success:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+}
+
+.attachment-option .btn-secondary {
+  background: #ffffff;
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.attachment-option .btn-secondary:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.attachment-option .muted-text {
+  font-size: 12px;
+  color: #6b7280;
+  letter-spacing: 0.1px;
+}
+
+.attachment-option .muted-text strong {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* ---------- File Row ---------- */
+
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-left: 4px solid #dc2626;
+  font-size: 13px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.attachment-row:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  border-left-color: #b91c1c;
+}
+
+.attachment-check {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.attachment-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #111827;
+  font-weight: 500;
+}
+
+.attachment-size {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.view-btn,
+.link-btn {
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: none;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.view-btn {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.view-btn:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+
+.link-btn {
+  color: #6b7280;
+}
+
+.link-btn:hover {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.attachment-empty {
+  display: block;
+  margin-top: 8px;
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 12px;
+}

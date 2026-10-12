@@ -18,6 +18,20 @@ public interface IComplaintService
     Task<ComplaintDetailsDto> CreateAsync(CreateComplaintRequest request, CancellationToken cancellationToken);
     Task<ComplaintDetailsDto?> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ComplaintListItemDto>> ListAsync(Guid? departmentId, Guid? categoryId, string? status, CancellationToken cancellationToken);
+
+    // ---- Attachments ----
+    Task<IReadOnlyList<ComplaintAttachmentDto>> UploadAttachmentsAsync(
+        Guid complaintId,
+        IReadOnlyList<UploadAttachmentInput> files,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ComplaintAttachmentDto>> GetAttachmentsAsync(
+        Guid complaintId,
+        CancellationToken cancellationToken);
+
+    Task<(byte[] Content, string FileName, string ContentType)?> DownloadAttachmentAsync(
+        Guid attachmentId,
+        CancellationToken cancellationToken);
 }
 
 public interface IWorkflowDefinitionService

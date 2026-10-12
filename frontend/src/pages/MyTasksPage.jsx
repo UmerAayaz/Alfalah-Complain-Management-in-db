@@ -37,6 +37,10 @@ export default function MyTasksPage({ navigate }) {
   //   - attachment fields   -> array of File objects
   const [fieldValues, setFieldValues] = useState({})
 
+  // Complaint-level attachments (read-only preview + download)
+  const [attachments, setAttachments] = useState([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
+
   // =========================================================
   // LOAD MY WORK QUEUE
   // =========================================================
@@ -169,19 +173,32 @@ export default function MyTasksPage({ navigate }) {
     setError('')
     setSuccessMessage('')
 
+    // Reset attachments
+    setAttachments([])
+    setAttachmentsLoading(true)
+
     try {
       console.log('OPENING TASK:', task)
 
-      const [availableActions, form] = await Promise.all([
+      const [availableActions, form, complaintAttachments] = await Promise.all([
         api(`/workflow-tasks/${task.id}/actions`),
         api(`/workflow-tasks/${task.id}/form`),
+        api(`/complaints/${task.complaintId}/attachments`).catch((err) => {
+          console.error('Failed to load complaint attachments:', err)
+          return []
+        }),
       ])
 
       setActions(Array.isArray(availableActions) ? availableActions : [])
       setTaskForm(form)
+      setAttachments(
+        Array.isArray(complaintAttachments) ? complaintAttachments : []
+      )
     } catch (err) {
       console.error('FAILED TO LOAD TASK ACTIONS:', err)
       setError(err.message)
+    } finally {
+      setAttachmentsLoading(false)
     }
   }
 
@@ -193,9 +210,7 @@ export default function MyTasksPage({ navigate }) {
     if (!selected || !selectedAction) return
 
     if (selectedAction.requiresAssignee && !assigneeId) {
-      setError(
-        `Select a ${selectedAction.targetRoleCode} before continuing.`
-      )
+      setError(`Select a ${selectedAction.targetRoleCode} before continuing.`)
       return
     }
 
@@ -217,13 +232,9 @@ export default function MyTasksPage({ navigate }) {
       let attachmentCount = 0
 
       taskForm?.currentFields?.forEach((field) => {
-        const isAttachment =
-          field.fieldType?.toLowerCase() === 'attachment'
+        const isAttachment = field.fieldType?.toLowerCase() === 'attachment'
 
         if (isAttachment) {
-          // Attachment files go as separate multipart parts.
-          // Backend supports both "files[<fieldId>]" and "files_<fieldId>".
-          // Here we use "files_<fieldId>" to match the current backend.
           const raw = fieldValues[field.id]
           const files = Array.isArray(raw) ? raw : raw ? [raw] : []
 
@@ -233,7 +244,6 @@ export default function MyTasksPage({ navigate }) {
 
           if (files.length > 0) attachmentCount += files.length
 
-          // Answer value is null — backend resolves it to the saved attachment.
           fieldAnswers.push({ fieldId: field.id, value: null })
           return
         }
@@ -264,7 +274,6 @@ export default function MyTasksPage({ navigate }) {
         body: formData,
       })
 
-      // Success banner
       setSuccessMessage(
         attachmentCount > 0
           ? `Task completed successfully with ${attachmentCount} attachment(s).`
@@ -272,7 +281,6 @@ export default function MyTasksPage({ navigate }) {
       )
       setTimeout(() => setSuccessMessage(''), 4000)
 
-      // Reset modal
       setSelected(null)
       setActions([])
       setAssignees([])
@@ -280,6 +288,7 @@ export default function MyTasksPage({ navigate }) {
       setComment('')
       setTaskForm(null)
       setFieldValues({})
+      setAttachments([])
 
       await load()
     } catch (err) {
@@ -435,9 +444,7 @@ export default function MyTasksPage({ navigate }) {
 
                 <button
                   className="task-title-link"
-                  onClick={() =>
-                    navigate(`/complaints/${task.complaintId}`)
-                  }
+                  onClick={() => navigate(`/complaints/${task.complaintId}`)}
                 >
                   {task.complaintNumber}
                 </button>
@@ -451,9 +458,7 @@ export default function MyTasksPage({ navigate }) {
                   </div>
                   <div>
                     <span>Assigned to</span>
-                    <strong>
-                      {task.assignedToUserName || 'Role queue'}
-                    </strong>
+                    <strong>{task.assignedToUserName || 'Role queue'}</strong>
                   </div>
                   <div>
                     <span>Opened</span>
@@ -493,9 +498,7 @@ export default function MyTasksPage({ navigate }) {
           <div className="modal">
             <div className="modal-header">
               <div>
-                <div className="eyebrow">
-                  {selected.complaintNumber}
-                </div>
+                <div className="eyebrow">{selected.complaintNumber}</div>
                 <h2>{selected.nodeName}</h2>
                 <p>{selected.complaintSubject}</p>
               </div>
@@ -510,6 +513,51 @@ export default function MyTasksPage({ navigate }) {
 
             <ErrorBanner message={error} />
 
+            {/* ============ COMPLAINT ATTACHMENTS ============ */}
+            {!reassigning && (
+              <div className="field">
+                <span>Complaint attachments ({attachments.length})</span>
+
+                {attachmentsLoading ? (
+                  <small className="muted-text">Loading attachments…</small>
+                ) : attachments.length === 0 ? (
+                  <span className="attachment-empty">
+                    No attachments on this complaint.
+                  </span>
+                ) : (
+                  <div className="attachment-list" style={{ marginTop: 8 }}>
+                    {attachments.map((a) => {
+                      const downloadUrl = `/api/complaints/attachments/${a.id}/download`
+                      const previewUrl = `${downloadUrl}?inline=true`
+
+                      return (
+                        <div key={a.id} className="attachment-row">
+                          <span className="attachment-check">✓</span>
+                          <span className="attachment-name">
+                            {a.fileName}
+                            <span className="attachment-size">
+                              ({(a.sizeBytes / 1024).toFixed(1)} KB)
+                            </span>
+                          </span>
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="view-btn"
+                          >
+                            Preview
+                          </a>
+                          <a href={downloadUrl} className="view-btn" download>
+                            Download
+                          </a>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {!reassigning ? (
               <>
                 {/* ACTION SELECTION */}
@@ -523,9 +571,7 @@ export default function MyTasksPage({ navigate }) {
                         key={`${action.targetNodeId}-${index}`}
                         type="button"
                         className={`action-choice ${
-                          selectedActionIndex === index
-                            ? 'selected'
-                            : ''
+                          selectedActionIndex === index ? 'selected' : ''
                         }`}
                         onClick={() => {
                           setSelectedActionIndex(index)
@@ -546,8 +592,7 @@ export default function MyTasksPage({ navigate }) {
 
                     {actions.length === 0 && (
                       <div className="inline-empty">
-                        No available transition was returned for this
-                        step.
+                        No available transition was returned for this step.
                       </div>
                     )}
                   </div>
@@ -567,15 +612,12 @@ export default function MyTasksPage({ navigate }) {
                       <select
                         className="input"
                         value={assigneeId}
-                        onChange={(event) =>
-                          setAssigneeId(event.target.value)
-                        }
+                        onChange={(event) => setAssigneeId(event.target.value)}
                         required={selectedAction.requiresAssignee}
                       >
                         {assignees.length === 0 && (
                           <option value="">
-                            No {selectedAction.targetRoleCode} users
-                            available
+                            No {selectedAction.targetRoleCode} users available
                           </option>
                         )}
 
@@ -593,14 +635,9 @@ export default function MyTasksPage({ navigate }) {
 
                       {selectedAction.requiresAssignee &&
                         assignees.length === 0 && (
-                          <small
-                            style={{
-                              color: '#b42318',
-                              marginTop: '6px',
-                            }}
-                          >
-                            No active {selectedAction.targetRoleCode} users
-                            were returned for this department.
+                          <small style={{ color: '#b42318', marginTop: '6px' }}>
+                            No active {selectedAction.targetRoleCode} users were
+                            returned for this department.
                           </small>
                         )}
                     </label>
@@ -623,9 +660,7 @@ export default function MyTasksPage({ navigate }) {
                     className="input textarea"
                     rows={4}
                     value={comment}
-                    onChange={(event) =>
-                      setComment(event.target.value)
-                    }
+                    onChange={(event) => setComment(event.target.value)}
                     placeholder="Add an optional action note…"
                   />
                 </label>
@@ -633,8 +668,7 @@ export default function MyTasksPage({ navigate }) {
                 {/* ACTION BUTTONS */}
 
                 <div className="modal-actions">
-                  {(roles.has('TeamLead') ||
-                    roles.has('UnitHead')) &&
+                  {(roles.has('TeamLead') || roles.has('UnitHead')) &&
                     selected.assignedRoleCode && (
                       <button
                         className="btn btn-secondary"
@@ -673,9 +707,8 @@ export default function MyTasksPage({ navigate }) {
                 {/* REASSIGNMENT VIEW */}
 
                 <div className="notice-box">
-                  Reassign this{' '}
-                  <strong>{selected.assignedRoleCode}</strong> task without
-                  advancing the workflow.
+                  Reassign this <strong>{selected.assignedRoleCode}</strong> task
+                  without advancing the workflow.
                 </div>
 
                 <label className="field">
@@ -684,9 +717,7 @@ export default function MyTasksPage({ navigate }) {
                   <select
                     className="input"
                     value={reassignUserId}
-                    onChange={(event) =>
-                      setReassignUserId(event.target.value)
-                    }
+                    onChange={(event) => setReassignUserId(event.target.value)}
                   >
                     {reassignUsers.length === 0 && (
                       <option value="">No users available</option>
@@ -707,9 +738,7 @@ export default function MyTasksPage({ navigate }) {
                     className="input textarea"
                     rows={3}
                     value={comment}
-                    onChange={(event) =>
-                      setComment(event.target.value)
-                    }
+                    onChange={(event) => setComment(event.target.value)}
                   />
                 </label>
 
