@@ -22,6 +22,8 @@ dotnet tool update --global dotnet-ef --version 8.0.0
 
 dotnet restore .\BankingPlatform.slnx
 
+Dotnet ef migrations add NewSchema --project src/BankingPlatform.Infrastructure
+--startup-project src/BankingPlatform.Api
 dotnet ef database update --project .\src\BankingPlatform.Infrastructure --startup-project .\src\BankingPlatform.Api
 
 $env:ASPNETCORE_ENVIRONMENT = "Development"
