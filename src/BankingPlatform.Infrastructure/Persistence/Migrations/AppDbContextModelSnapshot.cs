@@ -66,6 +66,10 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AutoReference")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
@@ -92,6 +96,9 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime?>("ResolvedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -115,6 +122,8 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("CurrentWorkflowInstanceId");
+
+                    b.HasIndex("ProductId");
 
                     b.ToTable("Complaints");
                 });
@@ -494,6 +503,36 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("LibraryFieldAttachmentConfigs");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.Product", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("Products");
+                });
+
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -509,6 +548,9 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("DefaultPriority")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -519,6 +561,9 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("PublishedAtUtc")
                         .HasColumnType("datetime2");
@@ -535,6 +580,8 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DepartmentId");
+
+                    b.HasIndex("ProductId");
 
                     b.HasIndex("CategoryId", "Version")
                         .IsUnique();
@@ -951,11 +998,18 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CurrentWorkflowInstanceId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("BankingPlatform.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Category");
 
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("CurrentWorkflowInstance");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.ComplaintAttachment", b =>
@@ -1044,6 +1098,17 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("LibraryField");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("BankingPlatform.Domain.Entities.ComplaintCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowDefinition", b =>
                 {
                     b.HasOne("BankingPlatform.Domain.Entities.ComplaintCategory", "Category")
@@ -1058,9 +1123,16 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("BankingPlatform.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Category");
 
                     b.Navigation("Department");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowFieldAttachment", b =>

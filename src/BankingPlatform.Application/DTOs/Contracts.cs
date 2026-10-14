@@ -9,7 +9,9 @@ public sealed record CreateComplaintRequest(
     string Subject,
     string Description,
     string? CustomerReference,
-    ComplaintPriority Priority = ComplaintPriority.Normal);
+    ComplaintPriority Priority = ComplaintPriority.Normal,
+    Guid? ProductId = null,
+    string? AutoReference = null);
 
 public sealed record ComplaintListItemDto(
     Guid Id,
@@ -37,7 +39,9 @@ public sealed record ComplaintDetailsDto(
     ComplaintPriority Priority,
     DateTime CreatedAtUtc,
     DateTime? ResolvedAtUtc,
-    IReadOnlyList<ComplaintEventDto> Timeline);
+    IReadOnlyList<ComplaintEventDto> Timeline,
+    string? ProductName = null,
+    string? AutoReference = null);
 
 // ============================================================
 // WORKFLOW DEFINITION (designer input)
@@ -67,7 +71,9 @@ public sealed record CreateWorkflowDefinitionRequest(
     Guid DepartmentId,
     Guid CategoryId,
     IReadOnlyList<WorkflowNodeRequest> Nodes,
-    IReadOnlyList<WorkflowEdgeRequest> Edges);
+    IReadOnlyList<WorkflowEdgeRequest> Edges,
+     int DefaultPriority = 1,
+     Guid? ProductId = null);    
 
 public sealed record WorkflowDefinitionDto(
     Guid Id,
@@ -77,7 +83,10 @@ public sealed record WorkflowDefinitionDto(
     int Version,
     WorkflowDefinitionStatus Status,
     string DesignerJson,
-    DateTime? PublishedAtUtc);
+    DateTime? PublishedAtUtc,
+    int DefaultPriority = 1,
+    Guid? ProductId = null,         // ← NEW
+    string? ProductName = null);    // ← NEW (display ke liye)
 
 // ============================================================
 // WORKFLOW TASKS
@@ -136,7 +145,7 @@ public sealed record WorkflowNodeFieldRequest(
 
 public sealed record ReassignWorkflowTaskRequest(Guid UserId, string? Comment);
 
-public sealed record ReferenceItemDto(Guid Id, string Code, string Name);
+public sealed record ReferenceItemDto(Guid Id, string? Code, string Name);
 
 public sealed record UserReferenceDto(
     Guid Id,

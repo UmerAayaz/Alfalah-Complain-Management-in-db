@@ -17,6 +17,10 @@ public sealed class WorkflowDefinition : EntityBase
     public DateTime? PublishedAtUtc { get; set; }
     public ICollection<WorkflowNode> Nodes { get; set; } = new List<WorkflowNode>();
     public ICollection<WorkflowTransition> Transitions { get; set; } = new List<WorkflowTransition>();
+    // NEW: default priority for workflow
+public int DefaultPriority { get; set; } = 1;   // 0=Low, 1=Normal, 2=High, 3=Critical
+   public Guid? ProductId { get; set; }
+public Product? Product { get; set; }
 }
 
 public sealed class WorkflowNode : EntityBase

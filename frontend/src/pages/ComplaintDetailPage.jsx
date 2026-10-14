@@ -60,6 +60,14 @@ export default function ComplaintDetailPage({ id, navigate }) {
           <PriorityBadge priority={complaint.priority} />
         </div>
         <div className="summary-item">
+          <span>Product</span>
+          <strong>{complaint.productName || '—'}</strong>
+        </div>
+        <div className="summary-item">
+          <span>Reference</span>
+          <strong>{complaint.autoReference || '—'}</strong>
+        </div>
+        <div className="summary-item">
           <span>Created</span>
           <strong>{formatDate(complaint.createdAtUtc)}</strong>
         </div>
@@ -120,7 +128,9 @@ export default function ComplaintDetailPage({ id, navigate }) {
         </div>
 
         {attachments.length === 0 ? (
-          <span className="attachment-empty">No attachments on this complaint.</span>
+          <span className="attachment-empty">
+            No attachments on this complaint.
+          </span>
         ) : (
           <div className="attachment-list">
             {attachments.map((a) => {

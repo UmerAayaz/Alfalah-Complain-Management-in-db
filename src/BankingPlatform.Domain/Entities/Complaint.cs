@@ -18,6 +18,13 @@ public sealed class Complaint : EntityBase
     public Guid? CurrentWorkflowInstanceId { get; set; }
     public WorkflowInstance? CurrentWorkflowInstance { get; set; }
     public DateTime? ResolvedAtUtc { get; set; }
+
+    // Selected product
+    public Guid? ProductId { get; set; }
+    public Product? Product { get; set; }
+
+    // Auto-generated reference
+    public string? AutoReference { get; set; }
 }
 
 public sealed class ComplaintEvent : EntityBase

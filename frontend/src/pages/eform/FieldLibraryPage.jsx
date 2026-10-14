@@ -61,6 +61,8 @@ export default function FieldLibraryPage({ navigate }) {
   const [draft, setDraft] = useState(emptyField())
   const [testValue, setTestValue] = useState('')
   const [optionsText, setOptionsText] = useState('')
+  const [optionList, setOptionList] = useState([])   // NEW: dynamic options
+
   const {
     page,
     setPage,
@@ -69,6 +71,7 @@ export default function FieldLibraryPage({ navigate }) {
     total,
     pageItems: pagedFields,
   } = usePagination(fields, 10)
+
   // ============================================================
   // LOAD
   // ============================================================
@@ -101,6 +104,7 @@ export default function FieldLibraryPage({ navigate }) {
     setEditingId(null)
     setDraft(emptyField())
     setOptionsText('')
+    setOptionList([])
     setTestValue('')
     setShowModal(true)
     setError('')
@@ -127,6 +131,7 @@ export default function FieldLibraryPage({ navigate }) {
       allowMultiple: field.allowMultiple ?? false,
     })
     setOptionsText((field.options || []).join('\n'))
+    setOptionList(field.options || [])
     setTestValue('')
     setShowModal(true)
     setError('')
@@ -137,6 +142,7 @@ export default function FieldLibraryPage({ navigate }) {
     setEditingId(null)
     setDraft(emptyField())
     setOptionsText('')
+    setOptionList([])
     setTestValue('')
     setError('')
   }
@@ -170,10 +176,7 @@ export default function FieldLibraryPage({ navigate }) {
         isRequired: !!draft.isRequired,
         options:
           draft.fieldType === 'dropdown' || draft.fieldType === 'radio'
-            ? optionsText
-                .split('\n')
-                .map((x) => x.trim())
-                .filter(Boolean)
+            ? optionList.map((x) => x.trim()).filter(Boolean)
             : null,
         regexPattern: draft.regexPattern?.trim() || null,
         regexMessage: draft.regexMessage?.trim() || null,
@@ -271,99 +274,98 @@ export default function FieldLibraryPage({ navigate }) {
 
       <ErrorBanner message={error} />
 
-<section className="panel">
-  {loading ? (
-    <div className="loading-block">Loading fields…</div>
-  ) : fields.length === 0 ? (
-    <div className="inline-empty" style={{ margin: 20 }}>
-      No fields yet. Click "Add Field" to create one.
-    </div>
-  ) : (
-    <>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Key</th>
-            <th>Type</th>
-            <th>Validation</th>
-            <th>Required</th>
-            <th style={{ width: 170 }}>Actions</th>
-          </tr>
-        </thead>
+      <section className="panel">
+        {loading ? (
+          <div className="loading-block">Loading fields…</div>
+        ) : fields.length === 0 ? (
+          <div className="inline-empty" style={{ margin: 20 }}>
+            No fields yet. Click "Add Field" to create one.
+          </div>
+        ) : (
+          <>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Key</th>
+                  <th>Type</th>
+                  <th>Validation</th>
+                  <th>Required</th>
+                  <th style={{ width: 170 }}>Actions</th>
+                </tr>
+              </thead>
 
-        <tbody>
-          {pagedFields.map((f) => (
-            <tr key={f.id}>
-              <td>
-                <strong>{f.label}</strong>
-              </td>
+              <tbody>
+                {pagedFields.map((f) => (
+                  <tr key={f.id}>
+                    <td>
+                      <strong>{f.label}</strong>
+                    </td>
 
-              <td>
-                <code>{f.fieldKey}</code>
-              </td>
+                    <td>
+                      <code>{f.fieldKey}</code>
+                    </td>
 
-              <td>
-                <span className="badge badge-type">
-                  {f.fieldType}
-                </span>
-              </td>
+                    <td>
+                      <span className="badge badge-type">
+                        {f.fieldType}
+                      </span>
+                    </td>
 
-              <td>
-                {f.regexPattern ? (
-                  <span className="badge badge-info">
-                    {f.validationType
-                      ? f.validationType.toUpperCase()
-                      : "REGEX"}
-                  </span>
-                ) : (
-                  <span className="muted">—</span>
-                )}
-              </td>
+                    <td>
+                      {f.regexPattern ? (
+                        <span className="badge badge-info">
+                          {f.validationType
+                            ? f.validationType.toUpperCase()
+                            : 'REGEX'}
+                        </span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
 
-              <td>
-                {f.isRequired ? (
-                  <span className="badge badge-success">
-                    Yes
-                  </span>
-                ) : (
-                  <span className="muted">No</span>
-                )}
-              </td>
+                    <td>
+                      {f.isRequired ? (
+                        <span className="badge badge-success">Yes</span>
+                      ) : (
+                        <span className="muted">No</span>
+                      )}
+                    </td>
 
-              <td>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => openEdit(f)}
-                >
-                  Edit
-                </button>
+                    <td>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openEdit(f)}
+                      >
+                        Edit
+                      </button>
 
-                <button
-                  className="btn btn-danger-soft btn-sm"
-                  style={{ marginLeft: 6 }}
-                  onClick={() => remove(f.id, f.label)}
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                      <button
+                        className="btn btn-danger-soft btn-sm"
+                        style={{ marginLeft: 6 }}
+                        onClick={() => remove(f.id, f.label)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-      {total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
-      )}
-    </>
-  )}
-</section>
+            {total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
+          </>
+        )}
+      </section>
+
       {/* =========================================================
           ADD / EDIT MODAL
       ========================================================== */}
@@ -415,31 +417,18 @@ export default function FieldLibraryPage({ navigate }) {
                       autoFocus
                     />
                   </label>
-
-                  <label className="field compact">
-                    <span>Field Key</span>
-                    <input
-                      className="input mono"
-                      value={draft.fieldKey}
-                      onChange={(e) => update({ fieldKey: e.target.value })}
-                      placeholder="cnic_number"
-                      disabled={!!editingId}
-                    />
-                    <small className="muted-text">
-                      {editingId
-                        ? 'Cannot be changed after creation'
-                        : 'Leave empty to auto-generate'}
-                    </small>
-                  </label>
-                </div>
-
-                <div className="form-row">
                   <label className="field compact">
                     <span>Field Type</span>
                     <select
                       className="input"
                       value={draft.fieldType}
                       onChange={(e) => update({ fieldType: e.target.value })}
+                      disabled={!!editingId}
+                      style={
+                        editingId
+                          ? { background: '#f9fafb', cursor: 'not-allowed' }
+                          : undefined
+                      }
                     >
                       {FIELD_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>
@@ -447,59 +436,121 @@ export default function FieldLibraryPage({ navigate }) {
                         </option>
                       ))}
                     </select>
-                  </label>
-
-                  <label className="field compact">
-                    <span>Placeholder</span>
-                    <input
-                      className="input"
-                      value={draft.placeholder}
-                      onChange={(e) =>
-                        update({ placeholder: e.target.value })
-                      }
-                      placeholder="e.g. 42101-1234567-1"
-                    />
+                    {editingId && (
+                      <small className="muted-text">
+                        Field type cannot be changed after creation.
+                      </small>
+                    )}
                   </label>
                 </div>
-{/* 
-                <label className="checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={!!draft.isRequired}
-                    onChange={(e) =>
-                      update({ isRequired: e.target.checked })
-                    }
-                  />
-                  Mark as required field
-                </label> */}
+
+                {draft.fieldType !== 'attachment' && (
+                  <div className="form-row">
+                    <label className="field compact">
+                      <span>Placeholder</span>
+                      <input
+                        className="input"
+                        value={draft.placeholder}
+                        onChange={(e) =>
+                          update({ placeholder: e.target.value })
+                        }
+                        placeholder="e.g. 42101-111111-1"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               {/* ==================================================
-                  SECTION 2 — OPTIONS
+                  SECTION 2 — OPTIONS (DYNAMIC BUILDER)
               ================================================== */}
               {showOptionsSection && (
                 <div className="section-block">
-                  <div className="designer-section-title">Options</div>
+                  <div className="designer-section-title">
+                    Options
+                    <span className="option-count-badge">
+                      {optionList.length}
+                    </span>
+                  </div>
 
-                  <label className="field compact">
-                    <span>One option per line</span>
-                    <textarea
-                      className="input textarea"
-                      rows={5}
-                      value={optionsText}
-                      onChange={(e) => setOptionsText(e.target.value)}
-                      placeholder={'Option 1\nOption 2\nOption 3'}
-                    />
-                    <small className="muted-text">
-                      {
-                        optionsText
-                          .split('\n')
-                          .map((x) => x.trim())
-                          .filter(Boolean).length
-                      }{' '}
-                      option(s)
+                  <div className="option-builder">
+                    {optionList.length === 0 && (
+                      <div className="option-empty">
+                        <span className="option-empty-icon">☰</span>
+                        <div>
+                          <strong>No options yet</strong>
+                          <div className="muted-text">
+                            Add choices users will pick from.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {optionList.map((opt, index) => (
+                      <div className="option-row" key={index}>
+                        <span className="option-index">{index + 1}</span>
+
+                        <input
+                          className="input option-input"
+                          value={opt}
+                          placeholder={`Option ${index + 1}`}
+                          onChange={(e) => {
+                            const updated = [...optionList]
+                            updated[index] = e.target.value
+                            setOptionList(updated)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              setOptionList([...optionList, ''])
+                            }
+                            if (
+                              e.key === 'Backspace' &&
+                              opt === '' &&
+                              optionList.length > 1
+                            ) {
+                              e.preventDefault()
+                              setOptionList(
+                                optionList.filter((_, i) => i !== index)
+                              )
+                            }
+                          }}
+                          autoFocus={
+                            index === optionList.length - 1 && opt === ''
+                          }
+                        />
+
+                        <button
+                          type="button"
+                          className="option-remove-btn"
+                          onClick={() =>
+                            setOptionList(
+                              optionList.filter((_, i) => i !== index)
+                            )
+                          }
+                          title="Remove option"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      className="option-add-btn"
+                      onClick={() => setOptionList([...optionList, ''])}
+                    >
+                      + Add Option
+                    </button>
+
+                    <small
+                      className="muted-text"
+                      style={{ display: 'block', marginTop: 8 }}
+                    >
+                      Press <strong>Enter</strong> to add ·{' '}
+                      <strong>Backspace</strong> on empty row to remove
                     </small>
-                  </label>
+                  </div>
                 </div>
               )}
 
@@ -523,7 +574,9 @@ export default function FieldLibraryPage({ navigate }) {
                           <button
                             type="button"
                             key={t.value}
-                            className={`chip ${checked ? 'chip-active' : ''}`}
+                            className={`chip ${
+                              checked ? 'chip-active' : ''
+                            }`}
                             onClick={() => {
                               const cur = draft.allowedFileTypes || []
                               update({
@@ -554,7 +607,9 @@ export default function FieldLibraryPage({ navigate }) {
                         max="100"
                         value={draft.maxFileSizeMb ?? 5}
                         onChange={(e) =>
-                          update({ maxFileSizeMb: Number(e.target.value) })
+                          update({
+                            maxFileSizeMb: Number(e.target.value),
+                          })
                         }
                       />
                     </label>
@@ -584,7 +639,9 @@ export default function FieldLibraryPage({ navigate }) {
               ================================================== */}
               {showValidationSection && (
                 <div className="section-block">
-                  <div className="designer-section-title">Validation</div>
+                  <div className="designer-section-title">
+                    Validation
+                  </div>
 
                   <label className="field compact">
                     <span>Regex Preset</span>
@@ -778,8 +835,8 @@ export default function FieldLibraryPage({ navigate }) {
                 {saving
                   ? 'Saving…'
                   : editingId
-                  ? 'Save Changes'
-                  : 'Add Field'}
+                    ? 'Save Changes'
+                    : 'Add Field'}
               </button>
             </div>
           </div>

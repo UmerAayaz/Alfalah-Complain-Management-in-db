@@ -19,36 +19,52 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
             .FirstOrDefaultAsync(
                 x => x.Id == request.CategoryId && x.IsActive,
                 cancellationToken)
-            ?? throw new ArgumentException(
-                "Complaint category not found or inactive.");
+            ?? throw new ArgumentException("Complaint category not found or inactive.");
 
         var userExists = await db.Users.AnyAsync(
             x => x.Id == currentUser.UserId && x.IsActive,
             cancellationToken);
 
         if (!userExists)
-            throw new UnauthorizedAccessException(
-                "Current user is not registered.");
+            throw new UnauthorizedAccessException("Current user is not registered.");
+
+        // ============================================================
+        // NEW: Product validate karo (agar diya ho)
+        // ============================================================
+        if (request.ProductId.HasValue)
+{
+    var productValid = await db.Products
+        .AnyAsync(x => x.Id == request.ProductId.Value
+                    && x.CategoryId == request.CategoryId
+                    && x.IsActive,
+            cancellationToken);
+
+    if (!productValid)
+        throw new ArgumentException("Selected product is not valid for this category.");
+}
+
+        // ============================================================
+        // NEW: Auto reference generate karo
+        // ============================================================
+        var autoRef = string.IsNullOrWhiteSpace(request.AutoReference)
+            ? $"CMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}"
+            : request.AutoReference;
 
         var complaint = new Complaint
         {
-            ComplaintNumber =
-                $"CMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+            ComplaintNumber = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"),
 
             CategoryId = request.CategoryId,
-
             Subject = request.Subject.Trim(),
-
             Description = request.Description.Trim(),
-
-            CustomerReference =
-                request.CustomerReference?.Trim(),
-
+            CustomerReference = request.CustomerReference?.Trim(),
             Priority = request.Priority,
-
             Status = ComplaintStatus.Open,
+            CreatedByUserId = currentUser.UserId,
 
-            CreatedByUserId = currentUser.UserId
+            // NEW:
+            ProductId = request.ProductId,
+            AutoReference = autoRef
         };
 
         db.Complaints.Add(complaint);
@@ -56,28 +72,16 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
         db.ComplaintEvents.Add(new ComplaintEvent
         {
             ComplaintId = complaint.Id,
-
             ActorUserId = currentUser.UserId,
-
             EventType = "ComplaintCreated",
-
-            Message =
-                $"Complaint logged under category '{category.Name}'."
+            Message = $"Complaint logged under category '{category.Name}'."
         });
 
-        // PHASE 1
-        // Persist Complaint first.
         await db.SaveChangesAsync(cancellationToken);
 
-        // PHASE 2
-        // Create WorkflowInstance after Complaint exists.
-        await workflowRuntime.StartAsync(
-            complaint,
-            cancellationToken);
+        await workflowRuntime.StartAsync(complaint, cancellationToken);
 
-        return (await GetAsync(
-            complaint.Id,
-            cancellationToken))!;
+        return (await GetAsync(complaint.Id, cancellationToken))!;
     }
 
     public async Task<ComplaintDetailsDto?> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -85,6 +89,7 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
         var complaint = await db.Complaints.AsNoTracking()
             .Include(x => x.Category)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
         if (complaint is null) return null;
 
         var events = await db.ComplaintEvents.AsNoTracking()
@@ -97,6 +102,18 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
                 x.ActorUser == null ? null : x.ActorUser.DisplayName))
             .ToListAsync(cancellationToken);
 
+        // ============================================================
+        // NEW: Product name fetch karo
+        // ============================================================
+        string? productName = null;
+        if (complaint.ProductId.HasValue)
+        {
+            productName = await db.ComplaintCategories
+                .Where(x => x.Id == complaint.ProductId.Value)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         return new ComplaintDetailsDto(
             complaint.Id,
             complaint.ComplaintNumber,
@@ -108,18 +125,33 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
             complaint.Priority,
             complaint.CreatedAtUtc,
             complaint.ResolvedAtUtc,
-            events);
+            events,
+            productName,
+            complaint.AutoReference);
     }
 
     public async Task<IReadOnlyList<ComplaintListItemDto>> ListAsync(Guid? departmentId, Guid? categoryId, string? status, CancellationToken cancellationToken)
     {
         var query = db.Complaints.AsNoTracking().Include(x => x.Category).AsQueryable();
-        if (departmentId.HasValue) query = query.Where(x => x.Category.DepartmentId == departmentId.Value);
-        if (categoryId.HasValue) query = query.Where(x => x.CategoryId == categoryId.Value);
-        if (Enum.TryParse<ComplaintStatus>(status, true, out var parsed)) query = query.Where(x => x.Status == parsed);
+
+        if (departmentId.HasValue)
+            query = query.Where(x => x.Category.DepartmentId == departmentId.Value);
+
+        if (categoryId.HasValue)
+            query = query.Where(x => x.CategoryId == categoryId.Value);
+
+        if (Enum.TryParse<ComplaintStatus>(status, true, out var parsed))
+            query = query.Where(x => x.Status == parsed);
 
         return await query.OrderByDescending(x => x.CreatedAtUtc)
-            .Select(x => new ComplaintListItemDto(x.Id, x.ComplaintNumber, x.Category.Name, x.Subject, x.Status, x.Priority, x.CreatedAtUtc))
+            .Select(x => new ComplaintListItemDto(
+                x.Id,
+                x.ComplaintNumber,
+                x.Category.Name,
+                x.Subject,
+                x.Status,
+                x.Priority,
+                x.CreatedAtUtc))
             .ToListAsync(cancellationToken);
     }
 

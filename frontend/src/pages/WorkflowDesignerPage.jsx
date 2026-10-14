@@ -141,6 +141,9 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [forms, setForms] = useState([])
+  const [defaultPriority, setDefaultPriority] = useState(1)   // NEW
+  const [productId, setProductId] = useState('')       // NEW
+  const [products, setProducts] = useState([])         // NEW
 
   const selectedNode = useMemo(
     () => nodes.find((x) => x.id === selectedNodeId),
@@ -199,6 +202,30 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .catch((err) => setError(err.message))
   }, [departmentId])
 
+  // ---- Load products when category changes ----
+  useEffect(() => {
+    if (!categoryId) {
+      setProducts([])
+      setProductId('')
+      return
+    }
+
+    api(`/reference/products?categoryId=${categoryId}`)
+      .then((items) => {
+        const list = Array.isArray(items) ? items : []
+        setProducts(list)
+        // Agar selected product ab category mein nahi hai, toh reset karo
+        if (!list.some((x) => x.id === productId)) {
+          setProductId(list[0]?.id || '')
+        }
+      })
+      .catch((err) => {
+        console.error('Products load failed:', err)
+        setProducts([])
+        setProductId('')
+      })
+  }, [categoryId])
+
   // ---- Load existing workflow ----
   useEffect(() => {
     if (isNew || !workflowId) return
@@ -207,8 +234,10 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .then((item) => {
         setDefinition(item)
         setName(item.name)
+        setDefaultPriority(item.defaultPriority ?? 1)
         setDepartmentId(item.departmentId)
         setCategoryId(item.categoryId)
+        setProductId(item.productId || '')       // NEW
         const designer = JSON.parse(item.designerJson || '{}')
         const sourceNodes = read(designer, 'nodes', 'Nodes') || []
         const sourceEdges = read(designer, 'edges', 'Edges') || []
@@ -365,10 +394,10 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       current.map((edge) =>
         edge.id === selectedEdgeId
           ? {
-              ...edge,
-              label: patch.label ?? edge.label,
-              data: { ...edge.data, ...patch },
-            }
+            ...edge,
+            label: patch.label ?? edge.label,
+            data: { ...edge.data, ...patch },
+          }
           : edge
       )
     )
@@ -397,6 +426,8 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     name: name.trim(),
     departmentId,
     categoryId,
+    defaultPriority: Number(defaultPriority),
+    productId: productId || null,
 
     nodes: nodes.map((node) => ({
       key: node.id,
@@ -429,39 +460,39 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       configJson:
         Number(node.data.nodeType) === 1
           ? JSON.stringify({
-              assignmentMode: node.data.assignmentMode || 'queue',
-              sendEmailNotification: !!node.data.sendEmailNotification,
-            })
+            assignmentMode: node.data.assignmentMode || 'queue',
+            sendEmailNotification: !!node.data.sendEmailNotification,
+          })
           : null,
 
       fields:
         Number(node.data.nodeType) === 1
           ? (node.data.fields || []).map((field, index) => ({
-              fieldKey: field.fieldKey,
-              label: field.label,
-              fieldType: field.fieldType,
-              placeholder: field.placeholder || null,
-              isRequired: !!field.isRequired,
-              displayOrder: index,
-              options: field.options || [],
+            fieldKey: field.fieldKey,
+            label: field.label,
+            fieldType: field.fieldType,
+            placeholder: field.placeholder || null,
+            isRequired: !!field.isRequired,
+            displayOrder: index,
+            options: field.options || [],
 
-              allowedFileTypes:
-                field.fieldType === 'attachment'
-                  ? field.allowedFileTypes || null
-                  : null,
+            allowedFileTypes:
+              field.fieldType === 'attachment'
+                ? field.allowedFileTypes || null
+                : null,
 
-              maxFileSizeMb:
-                field.fieldType === 'attachment'
-                  ? field.maxFileSizeMb != null
-                    ? Number(field.maxFileSizeMb)
-                    : null
-                  : null,
+            maxFileSizeMb:
+              field.fieldType === 'attachment'
+                ? field.maxFileSizeMb != null
+                  ? Number(field.maxFileSizeMb)
+                  : null
+                : null,
 
-              allowMultiple:
-                field.fieldType === 'attachment'
-                  ? !!field.allowMultiple
-                  : null,
-            }))
+            allowMultiple:
+              field.fieldType === 'attachment'
+                ? !!field.allowMultiple
+                : null,
+          }))
           : [],
     })),
 
@@ -482,9 +513,9 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       const saved = isNew
         ? await api('/workflow-definitions', { method: 'POST', body: payload })
         : await api(`/workflow-definitions/${workflowId}`, {
-            method: 'PUT',
-            body: payload,
-          })
+          method: 'PUT',
+          body: payload,
+        })
       setDefinition(saved)
       if (isNew) navigate(`/workflows/${saved.id}/designer`)
       return saved
@@ -633,6 +664,41 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                 {x.name}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="field compact">
+          <span>Product</span>
+          <select
+            className="input"
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            disabled={readOnly || !isNew || products.length === 0}
+            required
+          >
+            {products.length === 0 ? (
+              <option value="">No products for this category</option>
+            ) : (
+              products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+        <label className="field compact">
+          <span>Priority</span>
+          <select
+            className="input"
+            value={defaultPriority}
+            onChange={(e) => setDefaultPriority(Number(e.target.value))}
+            disabled={readOnly}
+          >
+            <option value={0}>Low</option>
+            <option value={1}>Normal</option>
+            <option value={2}>High</option>
+            <option value={3}>Critical</option>
           </select>
         </label>
       </section>

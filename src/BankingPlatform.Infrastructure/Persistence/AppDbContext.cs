@@ -7,6 +7,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<ComplaintCategory> ComplaintCategories => Set<ComplaintCategory>();
+    public DbSet<Product> Products => Set<Product>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<DepartmentMembership> DepartmentMemberships => Set<DepartmentMembership>();
     public DbSet<Complaint> Complaints => Set<Complaint>();
@@ -178,7 +179,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.WorkflowNodeId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        // ---- Inline field (optional — nullable for form-based tasks) ----
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.WorkflowNodeField)
             .WithMany()
@@ -186,7 +186,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .OnDelete(DeleteBehavior.NoAction)
             .IsRequired(false);
 
-        // ---- Library field (optional — nullable for inline-field tasks) ----
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.LibraryField)
             .WithMany()
@@ -306,7 +305,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .Property(x => x.MaxValue)
             .HasPrecision(18, 2);
 
-        // ---- Attachment config (1:1) ----
         modelBuilder.Entity<LibraryFieldAttachmentConfig>()
             .HasKey(x => x.Id);
 
@@ -373,35 +371,78 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.LibraryFieldId)
             .OnDelete(DeleteBehavior.Restrict);
 
-            // ============================================================
-// COMPLAINT ATTACHMENT — DB-only storage
-// ============================================================
+        // ============================================================
+        // COMPLAINT ATTACHMENT — DB-only storage
+        // ============================================================
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .HasKey(x => x.Id);
+        modelBuilder.Entity<ComplaintAttachment>()
+            .HasKey(x => x.Id);
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .Property(x => x.FileName)
-    .HasMaxLength(255)
-    .IsRequired();
+        modelBuilder.Entity<ComplaintAttachment>()
+            .Property(x => x.FileName)
+            .HasMaxLength(255)
+            .IsRequired();
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .Property(x => x.ContentType)
-    .HasMaxLength(150)
-    .IsRequired();
+        modelBuilder.Entity<ComplaintAttachment>()
+            .Property(x => x.ContentType)
+            .HasMaxLength(150)
+            .IsRequired();
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .Property(x => x.Content)
-    .HasColumnType("varbinary(max)")
-    .IsRequired();
+        modelBuilder.Entity<ComplaintAttachment>()
+            .Property(x => x.Content)
+            .HasColumnType("varbinary(max)")
+            .IsRequired();
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .HasIndex(x => x.ComplaintId);
+        modelBuilder.Entity<ComplaintAttachment>()
+            .HasIndex(x => x.ComplaintId);
 
-modelBuilder.Entity<ComplaintAttachment>()
-    .HasOne<Complaint>()
-    .WithMany()
-    .HasForeignKey(x => x.ComplaintId)
-    .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ComplaintAttachment>()
+            .HasOne<Complaint>()
+            .WithMany()
+            .HasForeignKey(x => x.ComplaintId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ============================================================
+        // PRODUCTS
+        // ============================================================
+
+
+        modelBuilder.Entity<Product>()
+            .Property(x => x.Name)
+            .HasMaxLength(200)
+            .IsRequired();
+
+
+        modelBuilder.Entity<Product>()
+            .HasOne(x => x.Category)
+            .WithMany()
+            .HasForeignKey(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ============================================================
+        // COMPLAINT → Product
+        // ============================================================
+
+        modelBuilder.Entity<Complaint>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        modelBuilder.Entity<Complaint>()
+            .Property(x => x.AutoReference)
+            .HasMaxLength(50);
+
+        // ============================================================
+        // WORKFLOW DEFINITION → Product
+        // ============================================================
+
+        modelBuilder.Entity<WorkflowDefinition>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

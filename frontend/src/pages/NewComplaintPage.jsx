@@ -5,17 +5,22 @@ import ErrorBanner from '../components/ErrorBanner.jsx'
 
 export default function NewComplaintPage({ navigate }) {
   const [categories, setCategories] = useState([])
+  const [products, setProducts] = useState([])
   const [form, setForm] = useState({
     categoryId: '',
+    productId: '',
     subject: '',
     description: '',
-    customerReference: '',
-    priority: 1
+    priority: 1,
+    autoReference: ''
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [files, setFiles] = useState([])
 
+  // ============================================================
+  // LOAD CATEGORIES (top-level only)
+  // ============================================================
   useEffect(() => {
     api('/reference/categories')
       .then((items) => {
@@ -26,36 +31,113 @@ export default function NewComplaintPage({ navigate }) {
       .catch((err) => setError(err.message))
   }, [])
 
-  const submit = async (e) => {
-  e.preventDefault()
-  setSaving(true)
-  setError('')
-  try {
-    // 1. Complaint create karo
-    const created = await api('/complaints', {
-      method: 'POST',
-      body: { ...form, priority: Number(form.priority) }
-    })
-
-    // 2. Attachments upload karo (agar hain)
-    if (files.length > 0) {
-      const formData = new FormData()
-      files.forEach((f) => formData.append('files', f))
-
-      await api(`/complaints/${created.id}/attachments`, {
-        method: 'POST',
-        body: formData
-      })
+  // ============================================================
+  // LOAD PRODUCTS when category changes
+  // ============================================================
+  useEffect(() => {
+    if (!form.categoryId) {
+      setProducts([])
+      return
     }
 
-    // 3. Navigate
-    navigate(`/complaints/${created.id}`)
-  } catch (err) {
-    setError(err.message)
-  } finally {
-    setSaving(false)
+    api(`/reference/products?categoryId=${form.categoryId}`)
+      .then((items) => {
+        const list = Array.isArray(items) ? items : []
+        setProducts(list)
+        setForm((current) => ({
+          ...current,
+          productId: list.length ? list[0].id : ''
+        }))
+      })
+      .catch((err) => {
+        console.error('Products load failed:', err)
+        setProducts([])
+      })
+  }, [form.categoryId])
+
+  // ============================================================
+  // LOAD DEFAULT PRIORITY when category changes
+  // ============================================================
+  useEffect(() => {
+  if (!form.categoryId) return
+
+  const url = form.productId
+    ? `/reference/workflow-defaults?categoryId=${form.categoryId}&productId=${form.productId}`
+    : `/reference/workflow-defaults?categoryId=${form.categoryId}`
+
+  api(url)
+    .then((data) => {
+      setForm((current) => ({
+        ...current,
+        priority: data?.defaultPriority ?? 1
+      }))
+    })
+    .catch((err) => {
+      console.error('Workflow defaults load failed:', err)
+    })
+}, [form.categoryId, form.productId])   // ← productId bhi add kiya
+
+  // ============================================================
+  // AUTO-GENERATE REFERENCE (client-side display only)
+  // ============================================================
+  useEffect(() => {
+  if (form.autoReference) return
+  const now = new Date()
+  const pad = (n, len = 2) => String(n).padStart(len, '0')
+  const ts = 
+    now.getUTCFullYear() +
+    pad(now.getUTCMonth() + 1) +
+    pad(now.getUTCDate()) +
+    pad(now.getUTCHours()) +
+    pad(now.getUTCMinutes()) +
+    pad(now.getUTCSeconds()) +
+    pad(now.getUTCMilliseconds(), 3)
+  setForm((current) => ({
+    ...current,
+    autoReference: ts
+  }))
+}, [])
+
+  // ============================================================
+  // SUBMIT
+  // ============================================================
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      // 1. Complaint create karo
+      const created = await api('/complaints', {
+        method: 'POST',
+        body: {
+          categoryId: form.categoryId,
+          productId: form.productId || null,
+          subject: form.subject,
+          description: form.description,
+          customerReference: null,
+          priority: Number(form.priority),
+          autoReference: form.autoReference || null
+        }
+      })
+
+      // 2. Attachments upload karo
+      if (files.length > 0) {
+        const formData = new FormData()
+        files.forEach((f) => formData.append('files', f))
+
+        await api(`/complaints/${created.id}/attachments`, {
+          method: 'POST',
+          body: formData
+        })
+      }
+
+      navigate(`/complaints/${created.id}`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
-}
 
   return (
     <>
@@ -68,12 +150,15 @@ export default function NewComplaintPage({ navigate }) {
 
       <form className="panel form-panel" onSubmit={submit}>
         <div className="form-grid two">
+          {/* Related To — Category */}
           <label className="field">
             <span>Related to</span>
             <select
               className="input"
               value={form.categoryId}
-              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, categoryId: e.target.value })
+              }
               required
             >
               {categories.map((x) => (
@@ -83,32 +168,61 @@ export default function NewComplaintPage({ navigate }) {
               ))}
             </select>
           </label>
+
+          {/* Product — filtered by category */}
           <label className="field">
-            <span>Priority</span>
+            <span>Product</span>
             <select
               className="input"
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              value={form.productId}
+              onChange={(e) =>
+                setForm({ ...form, productId: e.target.value })
+              }
+              required
+              disabled={products.length === 0}
             >
-              <option value="0">Low</option>
-              <option value="1">Normal</option>
-              <option value="2">High</option>
-              <option value="3">Critical</option>
+              {products.length === 0 ? (
+                <option value="">
+                  No products available for this category
+                </option>
+              ) : (
+                products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))
+              )}
             </select>
           </label>
         </div>
 
-        <label className="field">
-          <span>Customer / transaction reference</span>
-          <input
-            className="input"
-            value={form.customerReference}
-            onChange={(e) =>
-              setForm({ ...form, customerReference: e.target.value })
-            }
-            placeholder="Optional customer ID, account reference or transaction ID"
-          />
-        </label>
+        <div className="form-grid two">
+          {/* Priority — READ-ONLY (auto-fetched) */}
+          <label className="field">
+            <span>Priority (auto)</span>
+            <input
+              className="input"
+              value={
+                ['Low', 'Normal', 'High', 'Critical'][form.priority] || 'Normal'
+              }
+              readOnly
+              disabled
+              style={{ background: '#f9fafb', cursor: 'not-allowed' }}
+            />
+          </label>
+
+          {/* Auto Reference — READ-ONLY */}
+          <label className="field">
+            <span>Reference (auto-generated)</span>
+            <input
+              className="input"
+              value={form.autoReference}
+              readOnly
+              disabled
+              style={{ background: '#f9fafb', cursor: 'not-allowed' }}
+            />
+          </label>
+        </div>
 
         <label className="field">
           <span>Subject</span>
@@ -203,7 +317,9 @@ export default function NewComplaintPage({ navigate }) {
           </button>
           <button
             className="btn btn-primary"
-            disabled={saving || !form.categoryId}
+            disabled={
+              saving || !form.categoryId || !form.productId || products.length === 0
+            }
           >
             {saving ? 'Logging…' : 'Log complaint'}
           </button>

@@ -31,7 +31,11 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             Version = nextVersion,
             Status = WorkflowDefinitionStatus.Draft,
             CreatedByUserId = currentUser.UserId,
-            DesignerJson = JsonSerializer.Serialize(request)
+            DesignerJson = JsonSerializer.Serialize(request),
+
+            // NEW:
+            DefaultPriority = request.DefaultPriority,
+            ProductId = request.ProductId
         };
 
         BuildGraph(definition, request);
@@ -105,6 +109,8 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 DepartmentId = {request.DepartmentId},
                 CategoryId = {request.CategoryId},
                 DesignerJson = {designerJson},
+                DefaultPriority = {request.DefaultPriority},
+                ProductId = {request.ProductId},
                 UpdatedAtUtc = {now}
             WHERE Id = {id}", cancellationToken);
 
@@ -180,7 +186,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         }
 
         // Validate attached forms are Published
-                // Validate attached forms are Published
         var attachedFormIds = definition.Nodes
             .Where(x => x.FormId.HasValue)
             .Select(x => x.FormId!.Value)
@@ -197,25 +202,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 throw new InvalidOperationException(
                     $"Cannot publish: {unpublishedCount} attached form(s) are not Published. " +
                     "Please publish the forms first, or detach them from this workflow.");
-        }
-        // Validate every node is reachable from Start
-                // Validate attached forms are Published
-        var formIds = definition.Nodes
-            .Where(x => x.FormId.HasValue)
-            .Select(x => x.FormId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (formIds.Count > 0)
-        {
-            var unpublishedCount = await db.Forms
-                .Where(f => formIds.Contains(f.Id) && f.Status != "Published")
-                .CountAsync(cancellationToken);
-
-            if (unpublishedCount > 0)
-                throw new InvalidOperationException(
-                    $"Cannot publish: {unpublishedCount} attached form(s) are not Published. " +
-                    "Publish the forms first, or detach them from this workflow.");
         }
 
         // Validate every node is reachable from Start
@@ -327,8 +313,19 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         }
     }
 
+    // UPDATED: DefaultPriority + ProductId bhi bhejo
     private static WorkflowDefinitionDto Map(WorkflowDefinition x) =>
-        new(x.Id, x.Name, x.DepartmentId, x.CategoryId, x.Version, x.Status, x.DesignerJson, x.PublishedAtUtc);
+        new(x.Id,
+            x.Name,
+            x.DepartmentId,
+            x.CategoryId,
+            x.Version,
+            x.Status,
+            x.DesignerJson,
+            x.PublishedAtUtc,
+            x.DefaultPriority,
+            x.ProductId,
+            null);   // ProductName — filhaal null, chahiye toh Include karo
 
     // ============================================================
     // BUILD GRAPH (nodes + fields + transitions)
@@ -346,7 +343,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         // ---------------------------------------------------------
         foreach (var item in request.Nodes)
         {
-            // ✅ FIXED: node is now created (was commented out)
             var node = new WorkflowNode
             {
                 WorkflowDefinitionId = definition.Id,
@@ -362,7 +358,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 ConfigJson = item.ConfigJson
             };
 
-            // Dynamic fields only belong to Human Task nodes
             if (item.Type == WorkflowNodeType.HumanTask &&
                 item.Fields is not null)
             {
@@ -385,7 +380,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                             : JsonSerializer.Serialize(field.Options),
                     };
 
-                    // Attach the 1:1 config row for attachment fields only
                     if (isAttachment)
                     {
                         nodeField.AttachmentConfig = new WorkflowNodeFieldAttachmentConfig
@@ -403,7 +397,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             }
 
             definition.Nodes.Add(node);
-
             byKey[node.NodeKey] = node;
         }
 
@@ -414,51 +407,28 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                      x => x.Type == WorkflowNodeType.HumanTask))
         {
             if (string.IsNullOrWhiteSpace(node.RoleCode))
-            {
-                throw new ArgumentException(
-                    $"Human task '{node.Name}' needs a roleCode.");
-            }
+                throw new ArgumentException($"Human task '{node.Name}' needs a roleCode.");
 
             if (node.SlaHours is <= 0)
-            {
-                throw new ArgumentException(
-                    $"SLA hours for '{node.Name}' must be positive.");
-            }
+                throw new ArgumentException($"SLA hours for '{node.Name}' must be positive.");
 
-            var fields =
-                node.Fields ??
-                Array.Empty<WorkflowNodeFieldRequest>();
+            var fields = node.Fields ?? Array.Empty<WorkflowNodeFieldRequest>();
 
-            var keys = fields
-                .Select(x => x.FieldKey.Trim())
-                .ToList();
+            var keys = fields.Select(x => x.FieldKey.Trim()).ToList();
 
             if (keys.Any(string.IsNullOrWhiteSpace))
-            {
-                throw new ArgumentException(
-                    $"Every field in '{node.Name}' needs a field key.");
-            }
+                throw new ArgumentException($"Every field in '{node.Name}' needs a field key.");
 
-            if (keys.Count !=
-                keys.Distinct(StringComparer.OrdinalIgnoreCase).Count())
-            {
-                throw new ArgumentException(
-                    $"Duplicate field keys found in '{node.Name}'.");
-            }
+            if (keys.Count != keys.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+                throw new ArgumentException($"Duplicate field keys found in '{node.Name}'.");
 
             foreach (var field in fields)
             {
                 if (string.IsNullOrWhiteSpace(field.Label))
-                {
-                    throw new ArgumentException(
-                        $"Every field in '{node.Name}' needs a label.");
-                }
+                    throw new ArgumentException($"Every field in '{node.Name}' needs a label.");
 
                 if (string.IsNullOrWhiteSpace(field.FieldType))
-                {
-                    throw new ArgumentException(
-                        $"Field '{field.Label}' needs a field type.");
-                }
+                    throw new ArgumentException($"Field '{field.Label}' needs a field type.");
             }
         }
 
@@ -468,16 +438,10 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         foreach (var edge in request.Edges)
         {
             if (!byKey.TryGetValue(edge.SourceKey.Trim(), out var sourceNode))
-            {
-                throw new ArgumentException(
-                    $"Source node '{edge.SourceKey}' was not found.");
-            }
+                throw new ArgumentException($"Source node '{edge.SourceKey}' was not found.");
 
             if (!byKey.TryGetValue(edge.TargetKey.Trim(), out var targetNode))
-            {
-                throw new ArgumentException(
-                    $"Target node '{edge.TargetKey}' was not found.");
-            }
+                throw new ArgumentException($"Target node '{edge.TargetKey}' was not found.");
 
             var transition = new WorkflowTransition
             {
