@@ -992,4 +992,70 @@ export default function NewComplaintPage({ navigate }) {
 
 
 
+USE [BankingPlatform2];
+GO
+
+DECLARE @alfaMallId UNIQUEIDENTIFIER = 
+    (SELECT Id FROM ComplaintCategories WHERE Code = 'ALFA_MALL');
+DECLARE @atmId UNIQUEIDENTIFIER = 
+    (SELECT Id FROM ComplaintCategories WHERE Code = 'ATM');
+DECLARE @txnId UNIQUEIDENTIFIER = 
+    (SELECT Id FROM ComplaintCategories WHERE Code = 'TRANSACTION');
+
+-- Alfa Mall products
+INSERT INTO Products (Id, CategoryId, Name, IsActive, CreatedAtUtc)
+VALUES 
+  (NEWID(), @alfaMallId, 'Voucher Issue',       1, GETUTCDATE()),
+  (NEWID(), @alfaMallId, 'Points Not Credited', 1, GETUTCDATE()),
+  (NEWID(), @alfaMallId, 'Refund Delayed',      1, GETUTCDATE()),
+  (NEWID(), @alfaMallId, 'Product Quality',     1, GETUTCDATE());
+
+-- ATM products
+INSERT INTO Products (Id, CategoryId, Name, IsActive, CreatedAtUtc)
+VALUES 
+  (NEWID(), @atmId, 'Cash Not Dispensed', 1, GETUTCDATE()),
+  (NEWID(), @atmId, 'Card Retained',      1, GETUTCDATE()),
+  (NEWID(), @atmId, 'Wrong Balance',      1, GETUTCDATE());
+
+-- Transaction products
+INSERT INTO Products (Id, CategoryId, Name, IsActive, CreatedAtUtc)
+VALUES 
+  (NEWID(), @txnId, 'Failed Transaction',  1, GETUTCDATE()),
+  (NEWID(), @txnId, 'Pending Transaction', 1, GETUTCDATE()),
+  (NEWID(), @txnId, 'Reversal Issue',      1, GETUTCDATE());
+
+PRINT 'Inserted.';
+GO
+///////////////////////////////////////////////////////////
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace BankingPlatform.Infrastructure.Persistence.Migrations
+{
+    /// <inheritdoc />
+    public partial class RemoveLabelOverrideFromFormField : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropColumn(
+                name: "LabelOverride",
+                table: "FormFields");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<string>(
+                name: "LabelOverride",
+                table: "FormFields",
+                type: "nvarchar(200)",
+                maxLength: 200,
+                nullable: true);
+        }
+    }
+}
+
+
 
