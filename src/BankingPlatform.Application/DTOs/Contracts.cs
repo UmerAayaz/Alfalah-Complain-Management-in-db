@@ -4,18 +4,27 @@ using System.Text.Json.Serialization;
 
 namespace BankingPlatform.Application.DTOs;
 
+// ============================================================
+// COMPLAINT (input)
+// ============================================================
+// CustomerReference ab auto-generate hota hai backend se
+// (format: REF-YYYYMMDD-XXXX) — user se nahi liya jata
+// AutoReference deleted — ComplaintNumber hi unique ID hai
+// ============================================================
+
 public sealed record CreateComplaintRequest(
     Guid CategoryId,
     string Subject,
     string Description,
-    string? CustomerReference,
+    string? CustomerReference = null,
     ComplaintPriority Priority = ComplaintPriority.Normal,
-    Guid? ProductId = null,
-    string? AutoReference = null);
+    Guid? ProductId = null);
 
+    
 public sealed record ComplaintListItemDto(
     Guid Id,
     string ComplaintNumber,
+    string? CustomerReference,
     string Category,
     string Subject,
     ComplaintStatus Status,
@@ -40,8 +49,7 @@ public sealed record ComplaintDetailsDto(
     DateTime CreatedAtUtc,
     DateTime? ResolvedAtUtc,
     IReadOnlyList<ComplaintEventDto> Timeline,
-    string? ProductName = null,
-    string? AutoReference = null);
+    string? ProductName = null);
 
 // ============================================================
 // WORKFLOW DEFINITION (designer input)
@@ -58,7 +66,7 @@ public sealed record WorkflowNodeRequest(
     decimal Y,
     string? ConfigJson = null,
     IReadOnlyList<WorkflowNodeFieldRequest>? Fields = null,
-    Guid? FormId = null);                    // ← ye add karo
+    Guid? FormId = null);
 
 public sealed record WorkflowEdgeRequest(
     string SourceKey,
@@ -72,8 +80,8 @@ public sealed record CreateWorkflowDefinitionRequest(
     Guid CategoryId,
     IReadOnlyList<WorkflowNodeRequest> Nodes,
     IReadOnlyList<WorkflowEdgeRequest> Edges,
-     int DefaultPriority = 1,
-     Guid? ProductId = null);    
+    int DefaultPriority = 1,
+    Guid? ProductId = null);
 
 public sealed record WorkflowDefinitionDto(
     Guid Id,
@@ -85,8 +93,8 @@ public sealed record WorkflowDefinitionDto(
     string DesignerJson,
     DateTime? PublishedAtUtc,
     int DefaultPriority = 1,
-    Guid? ProductId = null,         // ← NEW
-    string? ProductName = null);    // ← NEW (display ke liye)
+    Guid? ProductId = null,
+    string? ProductName = null);
 
 // ============================================================
 // WORKFLOW TASKS
@@ -167,7 +175,10 @@ public sealed record CurrentUserDto(
     string Email,
     IReadOnlyList<CurrentUserMembershipDto> Memberships);
 
-    
+// ============================================================
+// COMPLAINT ATTACHMENTS
+// ============================================================
+
 public sealed record ComplaintAttachmentDto(
     Guid Id,
     Guid ComplaintId,
@@ -205,7 +216,7 @@ public sealed record WorkflowTaskFieldDto(
     int? MaxLength = null,
     decimal? MinValue = null,
     decimal? MaxValue = null);
-    
+
 public sealed record PreviousWorkflowFieldDto(
     string FieldKey,
     string Label,
@@ -234,7 +245,7 @@ public sealed record WorkflowTaskFormDto(
 
 public sealed record WorkflowFieldAnswerRequest(
     [property: JsonPropertyName("fieldId")] Guid FieldId,
-    [property: JsonPropertyName("value")]   JsonElement? Value)
+    [property: JsonPropertyName("value")] JsonElement? Value)
 {
     /// <summary>Convenience: get the value as a string when the JSON is a string.</summary>
     public string? AsString() => Value switch

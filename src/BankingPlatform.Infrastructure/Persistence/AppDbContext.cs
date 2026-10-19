@@ -19,7 +19,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
     public DbSet<WorkflowNodeField> WorkflowNodeFields => Set<WorkflowNodeField>();
     public DbSet<WorkflowFieldAttachment> WorkflowFieldAttachments => Set<WorkflowFieldAttachment>();
-    public DbSet<WorkflowNodeFieldAttachmentConfig> WorkflowNodeFieldAttachmentConfigs => Set<WorkflowNodeFieldAttachmentConfig>();
+    // public DbSet<WorkflowNodeFieldAttachmentConfig> WorkflowNodeFieldAttachmentConfigs => Set<WorkflowNodeFieldAttachmentConfig>();
     public DbSet<WorkflowFieldResponse> WorkflowFieldResponses => Set<WorkflowFieldResponse>();
     public DbSet<LibraryField> LibraryFields => Set<LibraryField>();
     public DbSet<LibraryFieldAttachmentConfig> LibraryFieldAttachmentConfigs => Set<LibraryFieldAttachmentConfig>();
@@ -41,6 +41,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<AppUser>().HasIndex(x => x.Email).IsUnique();
         modelBuilder.Entity<DepartmentMembership>().HasIndex(x => new { x.UserId, x.DepartmentId, x.RoleCode }).IsUnique();
         modelBuilder.Entity<Complaint>().HasIndex(x => x.ComplaintNumber).IsUnique();
+        modelBuilder.Entity<Complaint>()
+    .HasIndex(x => x.CustomerReference)
+    .IsUnique()
+    .HasFilter("[CustomerReference] IS NOT NULL");
         modelBuilder.Entity<WorkflowDefinition>().HasIndex(x => new { x.CategoryId, x.Version }).IsUnique();
         modelBuilder.Entity<WorkflowNode>().HasIndex(x => new { x.WorkflowDefinitionId, x.NodeKey }).IsUnique();
         modelBuilder.Entity<WorkflowTask>().HasIndex(x => new { x.Status, x.DueAtUtc });
@@ -238,22 +242,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         // ATTACHMENT CONFIG — 1:1 with WorkflowNodeField
         // ============================================================
 
-        modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
-            .HasKey(x => x.Id);
+        // modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
+        //     .HasKey(x => x.Id);
 
-        modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
-            .Property(x => x.AllowedFileTypesJson)
-            .HasMaxLength(500);
+        // modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
+        //     .Property(x => x.AllowedFileTypesJson)
+        //     .HasMaxLength(500);
 
-        modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
-            .HasIndex(x => x.WorkflowNodeFieldId)
-            .IsUnique();
+        // modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
+        //     .HasIndex(x => x.WorkflowNodeFieldId)
+        //     .IsUnique();
 
-        modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
-            .HasOne(x => x.WorkflowNodeField)
-            .WithOne(x => x.AttachmentConfig)
-            .HasForeignKey<WorkflowNodeFieldAttachmentConfig>(x => x.WorkflowNodeFieldId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // modelBuilder.Entity<WorkflowNodeFieldAttachmentConfig>()
+        //     .HasOne(x => x.WorkflowNodeField)
+        //     .WithOne(x => x.AttachmentConfig)
+        //     .HasForeignKey<WorkflowNodeFieldAttachmentConfig>(x => x.WorkflowNodeFieldId)
+        //     .OnDelete(DeleteBehavior.Cascade);
 
         // ============================================================
         // LIBRARY FIELDS — reusable form fields
@@ -355,9 +359,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<FormField>()
             .HasKey(x => x.Id);
 
-        modelBuilder.Entity<FormField>()
-            .Property(x => x.LabelOverride)
-            .HasMaxLength(200);
 
         modelBuilder.Entity<FormField>()
             .HasOne(x => x.Form)
@@ -430,9 +431,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 
-        modelBuilder.Entity<Complaint>()
-            .Property(x => x.AutoReference)
-            .HasMaxLength(50);
+        // modelBuilder.Entity<Complaint>()
+        //     .Property(x => x.AutoReference)
+        //     .HasMaxLength(50);
 
         // ============================================================
         // WORKFLOW DEFINITION → Product

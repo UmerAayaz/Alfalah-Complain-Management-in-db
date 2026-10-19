@@ -1192,3 +1192,23 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   font-style: italic;
   font-size: 12px;
 }
+
+/* Force dropdown consistency */
+.designer-config select.input,
+.designer-config input.input {
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #d1d5db !important;
+  background-color: #ffffff !important;
+  padding: 0 14px !important;
+  font-size: 14px !important;
+}
+
+.designer-config select.input:hover,
+.designer-config input.input:hover {
+  border-color: #d1d5db !important;
+  box-shadow: none !important;
+  background-color: #ffffff !important;
+}

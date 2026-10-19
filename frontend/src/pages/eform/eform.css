@@ -822,3 +822,501 @@
   background: #fef2f2;
   border-style: solid;
 }
+/* ============================================================
+   FORM USAGE PANEL
+   ============================================================ */
+
+.form-usage-section {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.form-usage-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.form-usage-empty svg {
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
+/* Stats row */
+.form-usage-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.form-usage-stat {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #9ca3af;
+}
+
+.form-usage-stat--workflows {
+  border-left-color: #3b82f6;
+}
+
+.form-usage-stat--stages {
+  border-left-color: #6366f1;
+}
+
+.form-usage-stat--published {
+  border-left-color: #10b981;
+}
+
+.form-usage-stat--draft {
+  border-left-color: #f59e0b;
+}
+
+.form-usage-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.form-usage-stat-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Workflow list */
+.form-usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-usage-workflow {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  transition: border-color 0.15s ease;
+}
+
+.form-usage-workflow:hover {
+  border-color: #d1d5db;
+}
+
+.form-usage-workflow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.form-usage-workflow-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.form-usage-workflow-name strong {
+  font-size: 13px;
+  color: #111827;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.form-usage-workflow-version {
+  font-size: 10px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Status badge */
+.form-usage-status {
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.form-usage-status--draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.form-usage-status--published {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.form-usage-status--archived {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* Stages */
+.form-usage-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.form-usage-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  font-size: 11px;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.form-usage-stage-icon {
+  display: inline-flex;
+  color: #3b82f6;
+}
+
+.form-usage-stage-name {
+  font-weight: 600;
+}
+
+.form-usage-stage-role {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .form-usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .form-usage-stats {
+    grid-template-columns: 1fr;
+  }
+}
+/* ============================================================
+   FORMS LIST — Grid + Cards
+   ============================================================ */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.form-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #e5e7eb;
+}
+
+.form-card--draft::before {
+  background: #f59e0b;
+}
+
+.form-card--published::before {
+  background: #10b981;
+}
+
+.form-card--archived::before {
+  background: #9ca3af;
+}
+
+.form-card:hover {
+  border-color: #fecaca;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Header */
+.form-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.form-card-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-card-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Status badge */
+.form-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.form-status-dot {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.form-status--draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.form-status--published {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.form-status--archived {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* Description */
+.form-card-description {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Usage section */
+.form-card-usage {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.form-card-usage-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.form-card-usage-empty svg {
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
+.form-card-usage-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #1e40af;
+  margin-bottom: 8px;
+}
+
+.form-card-usage-title svg {
+  flex-shrink: 0;
+}
+
+.form-card-usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-card-usage-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e0e7ff;
+}
+
+.form-card-usage-workflow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.form-card-usage-workflow-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a8a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-card-usage-workflow-status {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.form-card-usage-workflow-status--draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.form-card-usage-workflow-status--published {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.form-card-usage-workflow-status--archived {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.form-card-usage-stage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 10px;
+}
+
+.form-card-usage-stage-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.form-card-usage-stage-name {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.form-card-usage-role {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.form-card-usage-more {
+  font-size: 10px;
+  color: #3b82f6;
+  font-weight: 600;
+  text-align: center;
+  padding: 4px;
+}
+
+/* Footer */
+.form-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.form-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* In-use stat card */
+.wf-stat--used {
+  border-left-color: #3b82f6;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.form-card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}

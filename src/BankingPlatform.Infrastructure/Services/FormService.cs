@@ -338,7 +338,6 @@ public sealed class FormService(
             {
                 LibraryFieldId = field.LibraryFieldId,
                 DisplayOrder = field.DisplayOrder,
-                LabelOverride = field.LabelOverride,
                 IsRequiredOverride = field.IsRequiredOverride,
             });
         }
@@ -378,7 +377,7 @@ public sealed class FormService(
             ff.Id,
             ff.LibraryFieldId,
             lf.FieldKey,
-            ff.LabelOverride ?? lf.Label,
+            lf.Label,
             lf.FieldType,
             ff.IsRequiredOverride ?? lf.IsRequired,
             ff.DisplayOrder,

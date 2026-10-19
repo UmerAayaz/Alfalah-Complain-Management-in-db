@@ -126,7 +126,7 @@ public sealed class WorkflowTaskService(
     }
 
     // ============================================================
-    // FORM  (attached form OR inline fields)
+    // FORM (attached form OR inline fields)
     // ============================================================
 
     public async Task<WorkflowTaskFormDto> GetFormAsync(
@@ -137,7 +137,6 @@ public sealed class WorkflowTaskService(
             .AsNoTracking()
             .Include(x => x.WorkflowNode)
                 .ThenInclude(x => x.Fields)
-                    .ThenInclude(f => f.AttachmentConfig)
             .FirstOrDefaultAsync(x => x.Id == taskId, cancellationToken)
             ?? throw new KeyNotFoundException("Task not found.");
 
@@ -173,7 +172,7 @@ public sealed class WorkflowTaskService(
                 .AsNoTracking()
                 .Include(x => x.Fields)
                     .ThenInclude(x => x.LibraryField)
-                        .ThenInclude(lf => lf.AttachmentConfig)
+                        .ThenInclude(lf => lf.AttachmentConfig)   // ✅ LibraryField ka config — RAKHO
                 .FirstOrDefaultAsync(
                     x => x.Id == task.WorkflowNode.FormId.Value,
                     cancellationToken);
@@ -186,6 +185,9 @@ public sealed class WorkflowTaskService(
 
         if (attachedForm is not null && attachedForm.Fields.Count > 0)
         {
+            // ============================================================
+            // FORM-ATTACHED — Field Library use karta hai (LibraryFieldAttachmentConfig)
+            // ============================================================
             currentFields = attachedForm.Fields
                 .OrderBy(x => x.DisplayOrder)
                 .Select(ff =>
@@ -195,12 +197,13 @@ public sealed class WorkflowTaskService(
                     return new WorkflowTaskFieldDto(
                         lf.Id,
                         lf.FieldKey,
-                        ff.LabelOverride ?? lf.Label,
+                        lf.Label,
                         lf.FieldType,
                         lf.Placeholder,
                         ff.IsRequiredOverride ?? lf.IsRequired,
                         ff.DisplayOrder,
                         ParseOptions(lf.OptionsJson),
+                        // ✅ Field Library ka attachment config — RAKHO
                         lf.AttachmentConfig is null
                             ? null
                             : ParseAllowedFileTypes(lf.AttachmentConfig.AllowedFileTypesJson),
@@ -217,6 +220,10 @@ public sealed class WorkflowTaskService(
         }
         else
         {
+            // ============================================================
+            // INLINE FIELDS — WorkflowNodeField (koi attachment config nahi)
+            // ❌ AttachmentConfig field hata di — sab null
+            // ============================================================
             currentFields = task.WorkflowNode.Fields
                 .OrderBy(x => x.DisplayOrder)
                 .Select(field => new WorkflowTaskFieldDto(
@@ -228,12 +235,10 @@ public sealed class WorkflowTaskService(
                     field.IsRequired,
                     field.DisplayOrder,
                     ParseOptions(field.OptionsJson),
-                    field.AttachmentConfig is null
-                        ? null
-                        : ParseAllowedFileTypes(field.AttachmentConfig.AllowedFileTypesJson),
-                    field.AttachmentConfig?.MaxFileSizeMb,
-                    field.AttachmentConfig?.AllowMultiple,
-                    null,   // RegexPattern — inline fields ke liye null
+                    null,   // AllowedFileTypes — ❌ removed (was field.AttachmentConfig)
+                    null,   // MaxFileSizeMb   — ❌ removed
+                    null,   // AllowMultiple   — ❌ removed
+                    null,   // RegexPattern
                     null,   // RegexMessage
                     null,   // MinLength
                     null,   // MaxLength

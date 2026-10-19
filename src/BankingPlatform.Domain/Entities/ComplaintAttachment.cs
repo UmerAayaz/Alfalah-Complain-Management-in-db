@@ -4,8 +4,7 @@ public class ComplaintAttachment
 {
     public Guid Id { get; set; }
     public Guid ComplaintId { get; set; }
-    public Guid? WorkflowTaskId { get; set; }
-    public Guid? FieldId { get; set; }
+    
 
     public string FileName { get; set; } = default!;
     public string ContentType { get; set; } = default!;

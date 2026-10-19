@@ -10,6 +10,9 @@ namespace BankingPlatform.Infrastructure.Services;
 
 public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, IWorkflowRuntime workflowRuntime) : IComplaintService
 {
+    // ============================================================
+    // CREATE
+    // ============================================================
     public async Task<ComplaintDetailsDto> CreateAsync(
         CreateComplaintRequest request,
         CancellationToken cancellationToken)
@@ -28,43 +31,46 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
         if (!userExists)
             throw new UnauthorizedAccessException("Current user is not registered.");
 
-        // ============================================================
-        // NEW: Product validate karo (agar diya ho)
-        // ============================================================
+        // Product validate
         if (request.ProductId.HasValue)
-{
-    var productValid = await db.Products
-        .AnyAsync(x => x.Id == request.ProductId.Value
-                    && x.CategoryId == request.CategoryId
-                    && x.IsActive,
-            cancellationToken);
+        {
+            var productValid = await db.Products
+                .AnyAsync(x => x.Id == request.ProductId.Value
+                            && x.CategoryId == request.CategoryId
+                            && x.IsActive,
+                    cancellationToken);
 
-    if (!productValid)
-        throw new ArgumentException("Selected product is not valid for this category.");
-}
+            if (!productValid)
+                throw new ArgumentException("Selected product is not valid for this category.");
+        }
 
-        // ============================================================
-        // NEW: Auto reference generate karo
-        // ============================================================
-        var autoRef = string.IsNullOrWhiteSpace(request.AutoReference)
-            ? $"CMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}"
-            : request.AutoReference;
+        // Priority workflow se
+        int finalPriority = (int)request.Priority;
 
+        var workflow = await db.WorkflowDefinitions
+            .AsNoTracking()
+            .Where(x => x.CategoryId == request.CategoryId)
+            .Where(x => x.ProductId == request.ProductId)
+            .Where(x => x.Status == WorkflowDefinitionStatus.Published)
+            .OrderByDescending(x => x.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (workflow != null)
+            finalPriority = workflow.DefaultPriority;
+
+        // Complaint create
         var complaint = new Complaint
         {
             ComplaintNumber = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"),
+            CustomerReference = request.CustomerReference?.Trim(),
 
             CategoryId = request.CategoryId,
             Subject = request.Subject.Trim(),
             Description = request.Description.Trim(),
-            CustomerReference = request.CustomerReference?.Trim(),
-            Priority = request.Priority,
+            Priority = (ComplaintPriority)finalPriority,
             Status = ComplaintStatus.Open,
             CreatedByUserId = currentUser.UserId,
-
-            // NEW:
-            ProductId = request.ProductId,
-            AutoReference = autoRef
+            ProductId = request.ProductId
         };
 
         db.Complaints.Add(complaint);
@@ -78,12 +84,14 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
         });
 
         await db.SaveChangesAsync(cancellationToken);
-
         await workflowRuntime.StartAsync(complaint, cancellationToken);
 
         return (await GetAsync(complaint.Id, cancellationToken))!;
     }
 
+    // ============================================================
+    // GET
+    // ============================================================
     public async Task<ComplaintDetailsDto?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var complaint = await db.Complaints.AsNoTracking()
@@ -102,13 +110,10 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
                 x.ActorUser == null ? null : x.ActorUser.DisplayName))
             .ToListAsync(cancellationToken);
 
-        // ============================================================
-        // NEW: Product name fetch karo
-        // ============================================================
         string? productName = null;
         if (complaint.ProductId.HasValue)
         {
-            productName = await db.ComplaintCategories
+            productName = await db.Products
                 .Where(x => x.Id == complaint.ProductId.Value)
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -126,11 +131,17 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
             complaint.CreatedAtUtc,
             complaint.ResolvedAtUtc,
             events,
-            productName,
-            complaint.AutoReference);
+            productName);
     }
 
-    public async Task<IReadOnlyList<ComplaintListItemDto>> ListAsync(Guid? departmentId, Guid? categoryId, string? status, CancellationToken cancellationToken)
+    // ============================================================
+    // LIST
+    // ============================================================
+    public async Task<IReadOnlyList<ComplaintListItemDto>> ListAsync(
+        Guid? departmentId,
+        Guid? categoryId,
+        string? status,
+        CancellationToken cancellationToken)
     {
         var query = db.Complaints.AsNoTracking().Include(x => x.Category).AsQueryable();
 
@@ -147,6 +158,7 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
             .Select(x => new ComplaintListItemDto(
                 x.Id,
                 x.ComplaintNumber,
+                x.CustomerReference,
                 x.Category.Name,
                 x.Subject,
                 x.Status,
@@ -158,7 +170,6 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
     // ============================================================
     // ATTACHMENTS
     // ============================================================
-
     public async Task<IReadOnlyList<ComplaintAttachmentDto>> UploadAttachmentsAsync(
         Guid complaintId,
         IReadOnlyList<UploadAttachmentInput> files,
@@ -240,6 +251,9 @@ public sealed class ComplaintService(AppDbContext db, ICurrentUser currentUser, 
         return (a.Content, a.FileName, a.ContentType);
     }
 
+    // ============================================================
+    // HELPER
+    // ============================================================
     private static ComplaintAttachmentDto ToAttachmentDto(ComplaintAttachment x) =>
         new(
             x.Id,

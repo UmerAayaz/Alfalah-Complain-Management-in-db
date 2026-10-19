@@ -50,7 +50,7 @@ export default function ComplaintDetailPage({ id, navigate }) {
 
       <ErrorBanner message={error} />
 
-      <div className="complaint-summary panel">
+      {/* <div className="complaint-summary panel">
         <div className="summary-item">
           <span>Status</span>
           <StatusBadge status={complaint.status} />
@@ -75,7 +75,38 @@ export default function ComplaintDetailPage({ id, navigate }) {
           <span>Customer reference</span>
           <strong>{complaint.customerReference || '—'}</strong>
         </div>
-      </div>
+      </div> */}
+      <div className="complaint-summary panel">
+  <div className="summary-item">
+    <span>Complaint Number</span>
+    <strong>{complaint.complaintNumber}</strong>
+  </div>
+
+  <div className="summary-item">
+    <span>Status</span>
+    <StatusBadge status={complaint.status} />
+  </div>
+
+  <div className="summary-item">
+    <span>Priority</span>
+    <PriorityBadge priority={complaint.priority} />
+  </div>
+
+  <div className="summary-item">
+    <span>Product</span>
+    <strong>{complaint.productName || '—'}</strong>
+  </div>
+
+  <div className="summary-item">
+    <span>Customer Reference</span>
+    <strong>{complaint.customerReference || '—'}</strong>
+  </div>
+
+  <div className="summary-item">
+    <span>Created</span>
+    <strong>{formatDate(complaint.createdAtUtc)}</strong>
+  </div>
+</div>
 
       <div className="two-column-grid detail-grid">
         <section className="panel">

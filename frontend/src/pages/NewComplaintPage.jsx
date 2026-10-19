@@ -12,15 +12,32 @@ export default function NewComplaintPage({ navigate }) {
     subject: '',
     description: '',
     priority: 1,
-    autoReference: ''
+    customerReference: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [files, setFiles] = useState([])
 
   // ============================================================
-  // LOAD CATEGORIES (top-level only)
+  // AUTO-GENERATE CUSTOMER REFERENCE (once on mount)
+  // Format: REF-YYYY-MM-DD-XXXXXX (readable)
   // ============================================================
+  useEffect(() => {
+    const now = new Date()
+    const datePart =
+      now.getUTCFullYear() +
+      '-' +
+      String(now.getUTCMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(now.getUTCDate()).padStart(2, '0')
+
+    const randomPart = crypto.randomUUID().slice(0, 6).toUpperCase()
+    const customerReference = `REF-${datePart}-${randomPart}`
+
+    setForm((current) => ({ ...current, customerReference }))
+  }, [])
+
+  // Load categories
   useEffect(() => {
     api('/reference/categories')
       .then((items) => {
@@ -31,9 +48,7 @@ export default function NewComplaintPage({ navigate }) {
       .catch((err) => setError(err.message))
   }, [])
 
-  // ============================================================
-  // LOAD PRODUCTS when category changes
-  // ============================================================
+  // Load products when category changes
   useEffect(() => {
     if (!form.categoryId) {
       setProducts([])
@@ -46,7 +61,7 @@ export default function NewComplaintPage({ navigate }) {
         setProducts(list)
         setForm((current) => ({
           ...current,
-          productId: list.length ? list[0].id : ''
+          productId: list.length ? list[0].id : '',
         }))
       })
       .catch((err) => {
@@ -55,58 +70,27 @@ export default function NewComplaintPage({ navigate }) {
       })
   }, [form.categoryId])
 
-  // ============================================================
-  // LOAD DEFAULT PRIORITY when category changes
-  // ============================================================
+  // Load default priority
   useEffect(() => {
-  if (!form.categoryId) return
+    if (!form.categoryId) return
 
-  const url = form.productId
-    ? `/reference/workflow-defaults?categoryId=${form.categoryId}&productId=${form.productId}`
-    : `/reference/workflow-defaults?categoryId=${form.categoryId}`
+    api(`/reference/workflow-defaults?categoryId=${form.categoryId}`)
+      .then((data) => {
+        setForm((current) => ({
+          ...current,
+          priority: data?.defaultPriority ?? 1,
+        }))
+      })
+      .catch((err) => {
+        console.error('Workflow defaults load failed:', err)
+      })
+  }, [form.categoryId])
 
-  api(url)
-    .then((data) => {
-      setForm((current) => ({
-        ...current,
-        priority: data?.defaultPriority ?? 1
-      }))
-    })
-    .catch((err) => {
-      console.error('Workflow defaults load failed:', err)
-    })
-}, [form.categoryId, form.productId])   // ← productId bhi add kiya
-
-  // ============================================================
-  // AUTO-GENERATE REFERENCE (client-side display only)
-  // ============================================================
-  useEffect(() => {
-  if (form.autoReference) return
-  const now = new Date()
-  const pad = (n, len = 2) => String(n).padStart(len, '0')
-  const ts = 
-    now.getUTCFullYear() +
-    pad(now.getUTCMonth() + 1) +
-    pad(now.getUTCDate()) +
-    pad(now.getUTCHours()) +
-    pad(now.getUTCMinutes()) +
-    pad(now.getUTCSeconds()) +
-    pad(now.getUTCMilliseconds(), 3)
-  setForm((current) => ({
-    ...current,
-    autoReference: ts
-  }))
-}, [])
-
-  // ============================================================
-  // SUBMIT
-  // ============================================================
   const submit = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError('')
     try {
-      // 1. Complaint create karo
       const created = await api('/complaints', {
         method: 'POST',
         body: {
@@ -114,20 +98,18 @@ export default function NewComplaintPage({ navigate }) {
           productId: form.productId || null,
           subject: form.subject,
           description: form.description,
-          customerReference: null,
           priority: Number(form.priority),
-          autoReference: form.autoReference || null
-        }
+          customerReference: form.customerReference || null,
+        },
       })
 
-      // 2. Attachments upload karo
       if (files.length > 0) {
         const formData = new FormData()
         files.forEach((f) => formData.append('files', f))
 
         await api(`/complaints/${created.id}/attachments`, {
           method: 'POST',
-          body: formData
+          body: formData,
         })
       }
 
@@ -150,7 +132,6 @@ export default function NewComplaintPage({ navigate }) {
 
       <form className="panel form-panel" onSubmit={submit}>
         <div className="form-grid two">
-          {/* Related To — Category */}
           <label className="field">
             <span>Related to</span>
             <select
@@ -169,7 +150,6 @@ export default function NewComplaintPage({ navigate }) {
             </select>
           </label>
 
-          {/* Product — filtered by category */}
           <label className="field">
             <span>Product</span>
             <select
@@ -182,9 +162,7 @@ export default function NewComplaintPage({ navigate }) {
               disabled={products.length === 0}
             >
               {products.length === 0 ? (
-                <option value="">
-                  No products available for this category
-                </option>
+                <option value="">No products available</option>
               ) : (
                 products.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -197,13 +175,13 @@ export default function NewComplaintPage({ navigate }) {
         </div>
 
         <div className="form-grid two">
-          {/* Priority — READ-ONLY (auto-fetched) */}
           <label className="field">
             <span>Priority (auto)</span>
             <input
               className="input"
               value={
-                ['Low', 'Normal', 'High', 'Critical'][form.priority] || 'Normal'
+                ['Low', 'Normal', 'High', 'Critical'][form.priority] ||
+                'Normal'
               }
               readOnly
               disabled
@@ -211,15 +189,14 @@ export default function NewComplaintPage({ navigate }) {
             />
           </label>
 
-          {/* Auto Reference — READ-ONLY */}
           <label className="field">
-            <span>Reference (auto-generated)</span>
+            <span>Customer Reference (auto-generated)</span>
             <input
               className="input"
-              value={form.autoReference}
+              value={form.customerReference}
               readOnly
               disabled
-              style={{ background: '#f9fafb', cursor: 'not-allowed' }}
+              
             />
           </label>
         </div>
@@ -248,7 +225,6 @@ export default function NewComplaintPage({ navigate }) {
           />
         </label>
 
-        {/* ============ ATTACHMENTS ============ */}
         <div className="field" style={{ marginTop: 8 }}>
           <span>Attachments</span>
 
@@ -318,7 +294,10 @@ export default function NewComplaintPage({ navigate }) {
           <button
             className="btn btn-primary"
             disabled={
-              saving || !form.categoryId || !form.productId || products.length === 0
+              saving ||
+              !form.categoryId ||
+              !form.productId ||
+              products.length === 0
             }
           >
             {saving ? 'Logging…' : 'Log complaint'}

@@ -1,0 +1,156 @@
+/* ============================================================
+   WORKFLOWS PAGE — STATS + FILTERS
+   ============================================================ */
+
+/* ---------- Stats ---------- */
+.wf-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wf-stat {
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #9ca3af;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wf-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.wf-stat--published {
+  border-left-color: #10b981;
+}
+
+.wf-stat--draft {
+  border-left-color: #f59e0b;
+}
+
+.wf-stat--archived {
+  border-left-color: #6b7280;
+}
+
+.wf-stat-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.wf-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+/* ---------- Filters — single line ---------- */
+.wf-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.wf-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.wf-filters select {
+  flex-shrink: 0;
+  width: 180px;
+}
+
+.wf-filters .btn {
+  flex-shrink: 0;
+}
+
+/* ---------- Row extras ---------- */
+.wf-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.wf-row-meta {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* ---------- Priority pill ---------- */
+.wf-priority {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.wf-priority.priority-low {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.wf-priority.priority-normal {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.wf-priority.priority-high {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.wf-priority.priority-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .wf-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wf-filters {
+    flex-wrap: wrap;
+  }
+
+  .wf-filters select {
+    width: 100%;
+  }
+}
+.wf-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.wf-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.wf-search-wrap .wf-search {
+  width: 100%;
+  padding-left: 36px;
+}

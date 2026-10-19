@@ -66,10 +66,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("AutoReference")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
@@ -87,7 +83,7 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CustomerReference")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -123,6 +119,10 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CurrentWorkflowInstanceId");
 
+                    b.HasIndex("CustomerReference")
+                        .IsUnique()
+                        .HasFilter("[CustomerReference] IS NOT NULL");
+
                     b.HasIndex("ProductId");
 
                     b.ToTable("Complaints");
@@ -146,9 +146,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<Guid?>("FieldId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -162,9 +159,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("UploadedByUserId")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid?>("WorkflowTaskId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
@@ -379,10 +373,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
 
                     b.Property<bool?>("IsRequiredOverride")
                         .HasColumnType("bit");
-
-                    b.Property<string>("LabelOverride")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid>("LibraryFieldId")
                         .HasColumnType("uniqueidentifier");
@@ -842,39 +832,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("WorkflowNodeFields");
                 });
 
-            modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNodeFieldAttachmentConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool?>("AllowMultiple")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("AllowedFileTypesJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("MaxFileSizeMb")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("WorkflowNodeFieldId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WorkflowNodeFieldId")
-                        .IsUnique();
-
-                    b.ToTable("WorkflowNodeFieldAttachmentConfigs");
-                });
-
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1243,17 +1200,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("WorkflowNode");
                 });
 
-            modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNodeFieldAttachmentConfig", b =>
-                {
-                    b.HasOne("BankingPlatform.Domain.Entities.WorkflowNodeField", "WorkflowNodeField")
-                        .WithOne("AttachmentConfig")
-                        .HasForeignKey("BankingPlatform.Domain.Entities.WorkflowNodeFieldAttachmentConfig", "WorkflowNodeFieldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("WorkflowNodeField");
-                });
-
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowTask", b =>
                 {
                     b.HasOne("BankingPlatform.Domain.Entities.AppUser", "AssignedToUser")
@@ -1334,11 +1280,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNode", b =>
                 {
                     b.Navigation("Fields");
-                });
-
-            modelBuilder.Entity("BankingPlatform.Domain.Entities.WorkflowNodeField", b =>
-                {
-                    b.Navigation("AttachmentConfig");
                 });
 #pragma warning restore 612, 618
         }

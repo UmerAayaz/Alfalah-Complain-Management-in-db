@@ -23,8 +23,8 @@ public sealed class Complaint : EntityBase
     public Guid? ProductId { get; set; }
     public Product? Product { get; set; }
 
-    // Auto-generated reference
-    public string? AutoReference { get; set; }
+    // // Auto-generated reference
+    // public string? AutoReference { get; set; }
 }
 
 public sealed class ComplaintEvent : EntityBase

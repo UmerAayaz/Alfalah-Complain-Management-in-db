@@ -18,37 +18,37 @@ public sealed class WorkflowNodeField : EntityBase
     /// <summary>
     /// Attachment configuration. Only present when FieldType == "attachment".
     /// </summary>
-    public WorkflowNodeFieldAttachmentConfig? AttachmentConfig { get; set; }
+    // public WorkflowNodeFieldAttachmentConfig? AttachmentConfig { get; set; }
 }
 
-public sealed class WorkflowNodeFieldAttachmentConfig : EntityBase
-{
-    /// <summary>
-    /// FK to the parent WorkflowNodeField. One-to-one.
-    /// Only attachment-type fields have a row here.
-    /// </summary>
-    public Guid WorkflowNodeFieldId { get; set; }
+// public sealed class WorkflowNodeFieldAttachmentConfig : EntityBase
+// {
+//     /// <summary>
+//     /// FK to the parent WorkflowNodeField. One-to-one.
+//     /// Only attachment-type fields have a row here.
+//     /// </summary>
+//     public Guid WorkflowNodeFieldId { get; set; }
 
-    public WorkflowNodeField WorkflowNodeField { get; set; } = null!;
+//     public WorkflowNodeField WorkflowNodeField { get; set; } = null!;
 
-    /// <summary>
-    /// JSON array of allowed file extensions, e.g. ["pdf","jpg","png"].
-    /// Null or empty means "any file type is allowed".
-    /// </summary>
-    public string? AllowedFileTypesJson { get; set; }
+//     /// <summary>
+//     /// JSON array of allowed file extensions, e.g. ["pdf","jpg","png"].
+//     /// Null or empty means "any file type is allowed".
+//     /// </summary>
+//     public string? AllowedFileTypesJson { get; set; }
 
-    /// <summary>
-    /// Maximum allowed file size in megabytes.
-    /// Null means "use the system default" (currently 5 MB).
-    /// </summary>
-    public int? MaxFileSizeMb { get; set; }
+//     /// <summary>
+//     /// Maximum allowed file size in megabytes.
+//     /// Null means "use the system default" (currently 5 MB).
+//     /// </summary>
+//     public int? MaxFileSizeMb { get; set; }
 
-    /// <summary>
-    /// Whether multiple files can be uploaded for this field.
-    /// Null or false means single-file only.
-    /// </summary>
-    public bool? AllowMultiple { get; set; }
-}
+//     /// <summary>
+//     /// Whether multiple files can be uploaded for this field.
+//     /// Null or false means single-file only.
+//     /// </summary>
+//     public bool? AllowMultiple { get; set; }
+// }
 public sealed class WorkflowFieldResponse : EntityBase
 {
     public Guid ComplaintId { get; set; }

@@ -32,8 +32,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             Status = WorkflowDefinitionStatus.Draft,
             CreatedByUserId = currentUser.UserId,
             DesignerJson = JsonSerializer.Serialize(request),
-
-            // NEW:
             DefaultPriority = request.DefaultPriority,
             ProductId = request.ProductId
         };
@@ -41,11 +39,13 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         BuildGraph(definition, request);
         db.WorkflowDefinitions.Add(definition);
         await db.SaveChangesAsync(cancellationToken);
-        return Map(definition);
+        var dto = Map(definition);
+        db.ChangeTracker.Clear();
+        return dto;
     }
 
     // ============================================================
-    // UPDATE DRAFT — pure raw SQL, no EF UPDATE/DELETE
+    // UPDATE DRAFT
     // ============================================================
 
     public async Task<WorkflowDefinitionDto> UpdateDraftAsync(
@@ -55,7 +55,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
     {
         Validate(request);
 
-        // ---- 1. Load fresh WITHOUT tracking ----
         var existing = await db.WorkflowDefinitions
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
@@ -63,27 +62,20 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
         await EnsureDepartmentAdminAsync(existing.DepartmentId, cancellationToken);
 
-        if (request.DepartmentId != existing.DepartmentId ||
-            request.CategoryId != existing.CategoryId)
-            throw new InvalidOperationException(
-                "A draft version cannot be moved to another department/category. Create a new workflow there instead.");
-
         if (existing.Status != WorkflowDefinitionStatus.Draft)
             throw new InvalidOperationException(
                 "Published workflows are immutable. Create a new version instead.");
 
-        // ---- 2. Clear any tracked entities ----
         db.ChangeTracker.Clear();
 
-        // ---- 3. Delete all children via raw SQL (deepest first) ----
-        await db.Database.ExecuteSqlInterpolatedAsync($@"
-            DELETE FROM WorkflowNodeFieldAttachmentConfigs
-            WHERE WorkflowNodeFieldId IN (
-                SELECT f.Id
-                FROM WorkflowNodeFields f
-                INNER JOIN WorkflowNodes n ON n.Id = f.WorkflowNodeId
-                WHERE n.WorkflowDefinitionId = {id}
-            )", cancellationToken);
+        // STEP 1: Purane children delete
+        // await db.Database.ExecuteSqlInterpolatedAsync($@"
+        //     DELETE FROM WorkflowNodeFieldAttachmentConfigs
+        //     WHERE WorkflowNodeFieldId IN (
+        //         SELECT f.Id FROM WorkflowNodeFields f
+        //         INNER JOIN WorkflowNodes n ON n.Id = f.WorkflowNodeId
+        //         WHERE n.WorkflowDefinitionId = {id}
+        //     )", cancellationToken);
 
         await db.Database.ExecuteSqlInterpolatedAsync($@"
             DELETE FROM WorkflowNodeFields
@@ -99,50 +91,65 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             DELETE FROM WorkflowNodes
             WHERE WorkflowDefinitionId = {id}", cancellationToken);
 
-        // ---- 4. Update parent row via raw SQL (no EF UPDATE) ----
+        // STEP 2: Parent update
         var designerJson = JsonSerializer.Serialize(request);
         var now = DateTime.UtcNow;
 
-        await db.Database.ExecuteSqlInterpolatedAsync($@"
-            UPDATE WorkflowDefinitions
-            SET Name = {request.Name.Trim()},
-                DepartmentId = {request.DepartmentId},
-                CategoryId = {request.CategoryId},
-                DesignerJson = {designerJson},
-                DefaultPriority = {request.DefaultPriority},
-                ProductId = {request.ProductId},
-                UpdatedAtUtc = {now}
-            WHERE Id = {id}", cancellationToken);
+await db.Database.ExecuteSqlInterpolatedAsync($@"
+    UPDATE WorkflowDefinitions
+    SET Name = {request.Name.Trim()},
+        DepartmentId = {request.DepartmentId},
+        CategoryId = {request.CategoryId},
+        DesignerJson = {designerJson},
+        DefaultPriority = {request.DefaultPriority},
+        ProductId = {request.ProductId},
+        UpdatedAtUtc = {now}
+    WHERE Id = {id}", cancellationToken);
 
-        // ---- 5. Reload parent fresh (no tracking) ----
+        // STEP 3: Fresh parent (tracked)
         db.ChangeTracker.Clear();
-
         var fresh = await db.WorkflowDefinitions
-            .AsNoTracking()
             .FirstAsync(x => x.Id == id, cancellationToken);
 
-        // Attach as Unchanged so EF won't try to UPDATE it
-        db.WorkflowDefinitions.Attach(fresh);
-        db.Entry(fresh).State = EntityState.Unchanged;
-
-        fresh.Nodes.Clear();
-        fresh.Transitions.Clear();
-
-        // ---- 6. Build new graph (only INSERTs now) ----
+        // STEP 4: BuildGraph — new nodes/transitions
         BuildGraph(fresh, request);
 
-        // ---- 7. Save — EF only INSERTs new rows ----
+        // STEP 5: EXPLICIT tracking — EF ko pakka batao
+        foreach (var node in fresh.Nodes)
+        {
+            db.WorkflowNodes.Add(node);
+
+            foreach (var field in node.Fields)
+            {
+                db.WorkflowNodeFields.Add(field);
+
+                // if (field.AttachmentConfig != null)
+                //     db.WorkflowNodeFieldAttachmentConfigs.Add(field.AttachmentConfig);
+            }
+        }
+
+        foreach (var transition in fresh.Transitions)
+        {
+            db.WorkflowTransitions.Add(transition);
+        }
+
+        // STEP 6: Save
         await db.SaveChangesAsync(cancellationToken);
 
-        return Map(fresh);
+        // STEP 7: DTO + clear tracker
+        var dto = Map(fresh);
+        db.ChangeTracker.Clear();
+        return dto;
     }
 
     // ============================================================
-    // PUBLISH — with validation
+    // PUBLISH
     // ============================================================
 
     public async Task<WorkflowDefinitionDto> PublishAsync(Guid id, CancellationToken cancellationToken)
     {
+        db.ChangeTracker.Clear();
+
         var definition = await db.WorkflowDefinitions
             .Include(x => x.Nodes)
             .Include(x => x.Transitions)
@@ -154,10 +161,7 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         if (definition.Status != WorkflowDefinitionStatus.Draft)
             throw new InvalidOperationException("Only draft workflows can be published.");
 
-        // ============================================================
-        // VALIDATE BEFORE PUBLISHING
-        // ============================================================
-
+        // Validation
         var startCount = definition.Nodes.Count(x => x.Type == WorkflowNodeType.Start);
         if (startCount != 1)
             throw new InvalidOperationException(
@@ -172,20 +176,22 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             throw new InvalidOperationException(
                 "Cannot publish: workflow must have at least Start and End nodes.");
 
-        // Validate transitions point to real nodes
+        var humanCount = definition.Nodes.Count(x => x.Type == WorkflowNodeType.HumanTask);
+        if (humanCount < 1)
+            throw new InvalidOperationException(
+                "Cannot publish: workflow must have at least 1 Human Task between Start and End nodes.");
+
         var nodeIds = definition.Nodes.Select(x => x.Id).ToHashSet();
         foreach (var t in definition.Transitions)
         {
             if (!nodeIds.Contains(t.SourceNodeId))
                 throw new InvalidOperationException(
                     "Cannot publish: a transition references a missing source node.");
-
             if (!nodeIds.Contains(t.TargetNodeId))
                 throw new InvalidOperationException(
                     "Cannot publish: a transition references a missing target node.");
         }
 
-        // Validate attached forms are Published
         var attachedFormIds = definition.Nodes
             .Where(x => x.FormId.HasValue)
             .Select(x => x.FormId!.Value)
@@ -200,11 +206,9 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
             if (unpublishedCount > 0)
                 throw new InvalidOperationException(
-                    $"Cannot publish: {unpublishedCount} attached form(s) are not Published. " +
-                    "Please publish the forms first, or detach them from this workflow.");
+                    $"Cannot publish: {unpublishedCount} attached form(s) are not Published.");
         }
 
-        // Validate every node is reachable from Start
         var startNode = definition.Nodes.First(x => x.Type == WorkflowNodeType.Start);
         var visited = new HashSet<Guid> { startNode.Id };
         var queue = new Queue<Guid>();
@@ -216,12 +220,9 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             var outgoing = definition.Transitions
                 .Where(t => t.SourceNodeId == current)
                 .Select(t => t.TargetNodeId);
-
             foreach (var next in outgoing)
-            {
                 if (visited.Add(next))
                     queue.Enqueue(next);
-            }
         }
 
         var unreachable = definition.Nodes
@@ -233,10 +234,7 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             throw new InvalidOperationException(
                 "Cannot publish: unreachable nodes — " + string.Join(", ", unreachable));
 
-        // ============================================================
-        // ARCHIVE OLD + PUBLISH
-        // ============================================================
-
+        // Archive + Publish
         var oldPublished = await db.WorkflowDefinitions
             .Where(x => x.CategoryId == definition.CategoryId && x.Status == WorkflowDefinitionStatus.Published)
             .ToListAsync(cancellationToken);
@@ -251,7 +249,10 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         definition.PublishedAtUtc = DateTime.UtcNow;
         definition.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        return Map(definition);
+
+        var dto = Map(definition);
+        db.ChangeTracker.Clear();
+        return dto;
     }
 
     public async Task<WorkflowDefinitionDto> CreateNewVersionAsync(Guid id, CancellationToken cancellationToken)
@@ -290,13 +291,7 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         return items.Select(Map).ToList();
     }
 
-    // ============================================================
-    // AUTHORIZATION
-    // ============================================================
-
-    private async Task EnsureDepartmentAdminAsync(
-        Guid departmentId,
-        CancellationToken cancellationToken)
+    private async Task EnsureDepartmentAdminAsync(Guid departmentId, CancellationToken cancellationToken)
     {
         var allowed = await db.DepartmentMemberships
             .AsNoTracking()
@@ -307,40 +302,18 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 cancellationToken);
 
         if (!allowed)
-        {
             throw new UnauthorizedAccessException(
                 $"Workflow access denied. UserId={currentUser.UserId}, DepartmentId={departmentId}");
-        }
     }
 
-    // UPDATED: DefaultPriority + ProductId bhi bhejo
     private static WorkflowDefinitionDto Map(WorkflowDefinition x) =>
-        new(x.Id,
-            x.Name,
-            x.DepartmentId,
-            x.CategoryId,
-            x.Version,
-            x.Status,
-            x.DesignerJson,
-            x.PublishedAtUtc,
-            x.DefaultPriority,
-            x.ProductId,
-            null);   // ProductName — filhaal null, chahiye toh Include karo
+        new(x.Id, x.Name, x.DepartmentId, x.CategoryId, x.Version, x.Status,
+            x.DesignerJson, x.PublishedAtUtc, x.DefaultPriority, x.ProductId, null);
 
-    // ============================================================
-    // BUILD GRAPH (nodes + fields + transitions)
-    // ============================================================
-
-    private static void BuildGraph(
-        WorkflowDefinition definition,
-        CreateWorkflowDefinitionRequest request)
+    private static void BuildGraph(WorkflowDefinition definition, CreateWorkflowDefinitionRequest request)
     {
-        var byKey = new Dictionary<string, WorkflowNode>(
-            StringComparer.OrdinalIgnoreCase);
+        var byKey = new Dictionary<string, WorkflowNode>(StringComparer.OrdinalIgnoreCase);
 
-        // ---------------------------------------------------------
-        // 1. CREATE WORKFLOW NODES + DYNAMIC FIELDS
-        // ---------------------------------------------------------
         foreach (var item in request.Nodes)
         {
             var node = new WorkflowNode
@@ -357,84 +330,34 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
                 PositionY = item.Y,
                 ConfigJson = item.ConfigJson
             };
+if (item.Type == WorkflowNodeType.HumanTask &&
+    item.Fields is not null)
+{
+    foreach (var field in item.Fields.OrderBy(x => x.DisplayOrder))
+    {
+        var fieldType = field.FieldType.Trim().ToLowerInvariant();
 
-            if (item.Type == WorkflowNodeType.HumanTask &&
-                item.Fields is not null)
-            {
-                foreach (var field in item.Fields.OrderBy(x => x.DisplayOrder))
-                {
-                    var fieldType = field.FieldType.Trim().ToLowerInvariant();
-                    var isAttachment = fieldType == "attachment";
+        var nodeField = new WorkflowNodeField
+        {
+            WorkflowNodeId = node.Id,
+            FieldKey = field.FieldKey.Trim(),
+            Label = field.Label.Trim(),
+            FieldType = fieldType,
+            Placeholder = field.Placeholder?.Trim(),
+            IsRequired = field.IsRequired,
+            DisplayOrder = field.DisplayOrder,
+            OptionsJson = field.Options is null
+                ? null
+                : JsonSerializer.Serialize(field.Options),
+        };
 
-                    var nodeField = new WorkflowNodeField
-                    {
-                        WorkflowNodeId = node.Id,
-                        FieldKey = field.FieldKey.Trim(),
-                        Label = field.Label.Trim(),
-                        FieldType = fieldType,
-                        Placeholder = field.Placeholder?.Trim(),
-                        IsRequired = field.IsRequired,
-                        DisplayOrder = field.DisplayOrder,
-                        OptionsJson = field.Options is null
-                            ? null
-                            : JsonSerializer.Serialize(field.Options),
-                    };
-
-                    if (isAttachment)
-                    {
-                        nodeField.AttachmentConfig = new WorkflowNodeFieldAttachmentConfig
-                        {
-                            AllowedFileTypesJson = field.AllowedFileTypes is { Count: > 0 }
-                                ? JsonSerializer.Serialize(field.AllowedFileTypes)
-                                : null,
-                            MaxFileSizeMb = field.MaxFileSizeMb,
-                            AllowMultiple = field.AllowMultiple,
-                        };
-                    }
-
-                    node.Fields.Add(nodeField);
-                }
-            }
-
+        node.Fields.Add(nodeField);
+    }
+}
             definition.Nodes.Add(node);
             byKey[node.NodeKey] = node;
         }
 
-        // ---------------------------------------------------------
-        // 2. VALIDATE HUMAN TASKS + THEIR DYNAMIC FIELDS
-        // ---------------------------------------------------------
-        foreach (var node in request.Nodes.Where(
-                     x => x.Type == WorkflowNodeType.HumanTask))
-        {
-            if (string.IsNullOrWhiteSpace(node.RoleCode))
-                throw new ArgumentException($"Human task '{node.Name}' needs a roleCode.");
-
-            if (node.SlaHours is <= 0)
-                throw new ArgumentException($"SLA hours for '{node.Name}' must be positive.");
-
-            var fields = node.Fields ?? Array.Empty<WorkflowNodeFieldRequest>();
-
-            var keys = fields.Select(x => x.FieldKey.Trim()).ToList();
-
-            if (keys.Any(string.IsNullOrWhiteSpace))
-                throw new ArgumentException($"Every field in '{node.Name}' needs a field key.");
-
-            if (keys.Count != keys.Distinct(StringComparer.OrdinalIgnoreCase).Count())
-                throw new ArgumentException($"Duplicate field keys found in '{node.Name}'.");
-
-            foreach (var field in fields)
-            {
-                if (string.IsNullOrWhiteSpace(field.Label))
-                    throw new ArgumentException($"Every field in '{node.Name}' needs a label.");
-
-                if (string.IsNullOrWhiteSpace(field.FieldType))
-                    throw new ArgumentException($"Field '{field.Label}' needs a field type.");
-            }
-        }
-
-        // ---------------------------------------------------------
-        // 3. CREATE WORKFLOW TRANSITIONS FROM DESIGNER EDGES
-        // ---------------------------------------------------------
         foreach (var edge in request.Edges)
         {
             if (!byKey.TryGetValue(edge.SourceKey.Trim(), out var sourceNode))
@@ -443,20 +366,14 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             if (!byKey.TryGetValue(edge.TargetKey.Trim(), out var targetNode))
                 throw new ArgumentException($"Target node '{edge.TargetKey}' was not found.");
 
-            var transition = new WorkflowTransition
+            definition.Transitions.Add(new WorkflowTransition
             {
                 WorkflowDefinitionId = definition.Id,
                 SourceNodeId = sourceNode.Id,
                 TargetNodeId = targetNode.Id,
-                OutcomeKey = string.IsNullOrWhiteSpace(edge.OutcomeKey)
-                    ? null
-                    : edge.OutcomeKey.Trim(),
-                Label = string.IsNullOrWhiteSpace(edge.Label)
-                    ? null
-                    : edge.Label.Trim()
-            };
-
-            definition.Transitions.Add(transition);
+                OutcomeKey = string.IsNullOrWhiteSpace(edge.OutcomeKey) ? null : edge.OutcomeKey.Trim(),
+                Label = string.IsNullOrWhiteSpace(edge.Label) ? null : edge.Label.Trim()
+            });
         }
     }
 
@@ -465,10 +382,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         public string AssignmentMode { get; set; } = "queue";
         public bool SendEmailNotification { get; set; }
     }
-
-    // ============================================================
-    // VALIDATION
-    // ============================================================
 
     private static void Validate(CreateWorkflowDefinitionRequest request)
     {
@@ -483,6 +396,10 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
         if (request.Nodes.All(x => x.Type != WorkflowNodeType.End))
             throw new ArgumentException("Workflow needs at least one End node.");
+
+        var humanCount = request.Nodes.Count(x => x.Type == WorkflowNodeType.HumanTask);
+        if (humanCount < 1)
+            throw new ArgumentException("Workflow must have at least 1 Human Task between Start and End nodes.");
 
         var keys = request.Nodes.Select(x => x.Key.Trim()).ToList();
         if (keys.Any(string.IsNullOrWhiteSpace))
@@ -503,7 +420,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         {
             if (string.IsNullOrWhiteSpace(node.RoleCode))
                 throw new ArgumentException($"Human task '{node.Name}' needs a roleCode.");
-
             if (node.SlaHours is <= 0)
                 throw new ArgumentException($"SLA hours for '{node.Name}' must be positive.");
         }
@@ -522,9 +438,9 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
         {
             var current = q.Dequeue();
             if (!adjacency.TryGetValue(current, out var next)) continue;
-
             foreach (var n in next)
-                if (visited.Add(n)) q.Enqueue(n);
+                if (visited.Add(n))
+                    q.Enqueue(n);
         }
 
         var unreachable = keys.Where(k => !visited.Contains(k)).ToList();

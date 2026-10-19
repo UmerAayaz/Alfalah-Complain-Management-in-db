@@ -67,7 +67,7 @@ public sealed class SqlWorkflowRuntime(
         var task = await db.WorkflowTasks
             .Include(x => x.WorkflowNode)
                 .ThenInclude(x => x.Fields)
-                    .ThenInclude(f => f.AttachmentConfig)
+                    // .ThenInclude(f => f.AttachmentConfig)
             .Include(x => x.WorkflowInstance)
                 .ThenInclude(x => x.WorkflowDefinition)
                     .ThenInclude(x => x.Nodes)
@@ -112,7 +112,7 @@ public sealed class SqlWorkflowRuntime(
             attachedForm = await db.Forms
                 .Include(x => x.Fields)
                     .ThenInclude(x => x.LibraryField)
-                        .ThenInclude(lf => lf.AttachmentConfig)
+                        // .ThenInclude(lf => lf.AttachmentConfig)
                 .FirstOrDefaultAsync(
                     x => x.Id == task.WorkflowNode.FormId.Value,
                     cancellationToken);
@@ -129,7 +129,7 @@ public sealed class SqlWorkflowRuntime(
                 .OrderBy(x => x.DisplayOrder)
                 .Select(ff => new UnifiedField(
                     ff.LibraryFieldId,
-                    ff.LabelOverride ?? ff.LibraryField.Label,
+                    ff.LibraryField.Label,
                     ff.LibraryField.FieldType,
                     ff.IsRequiredOverride ?? ff.LibraryField.IsRequired))
                 .ToList()

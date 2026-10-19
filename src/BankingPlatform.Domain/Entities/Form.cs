@@ -11,8 +11,7 @@ public sealed class Form : EntityBase
     public string Status { get; set; } = "Draft";
     public Guid CreatedByUserId { get; set; }
     public DateTime? PublishedAtUtc { get; set; }
-    public Guid? DepartmentId { get; set; }
-    public Guid? CategoryId { get; set; }
+    
 
     public ICollection<FormField> Fields { get; set; } = new List<FormField>();
 }
@@ -27,7 +26,6 @@ public sealed class FormField : EntityBase
 
     public int DisplayOrder { get; set; }
 
-    public string? LabelOverride { get; set; }
 
     public bool? IsRequiredOverride { get; set; }
 }

@@ -19,19 +19,12 @@ import ErrorBanner from '../components/ErrorBanner.jsx'
 import WorkflowNode from '../workflow/WorkflowNode.jsx'
 import { workflowNodeType, workflowStatus } from '../constants.js'
 import WorkflowFieldBuilder from '../components/WorkflowFieldBuilder.jsx'
+import './workflow-designer.css'
 
 const nodeTypes = { workflowNode: WorkflowNode }
 const commonRoles = ['UnitHead', 'TeamLead', 'Officer', 'DeptAdmin']
 
-// ============================================================
-// LAYOUT & VIEW CONSTANTS
-// ============================================================
-const LAYOUT = {
-  START_X: 80,
-  START_Y: 180,
-  GAP_X: 220,
-}
-
+const LAYOUT = { START_X: 80, START_Y: 180, GAP_X: 230 }
 const VIEW = {
   MIN_ZOOM: 0.6,
   MAX_ZOOM: 1.8,
@@ -41,9 +34,10 @@ const VIEW = {
   FIT_DURATION: 300,
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
+const EDGE_STYLE = {
+  markerEnd: { type: MarkerType.ArrowClosed, color: '#111827' },
+  style: { stroke: '#111827', strokeWidth: 2, strokeDasharray: '6 4' },
+}
 
 function read(obj, camel, pascal) {
   return obj?.[camel] ?? obj?.[pascal]
@@ -81,7 +75,6 @@ function applyHorizontalLayout(nodes) {
 function buildChainEdges(nodes) {
   const sorted = sortNodes(nodes)
   const edges = []
-
   for (let i = 0; i < sorted.length - 1; i++) {
     const source = sorted[i]
     const target = sorted[i + 1]
@@ -89,11 +82,10 @@ function buildChainEdges(nodes) {
       id: `edge-${source.id}-${target.id}`,
       source: source.id,
       target: target.id,
-      markerEnd: { type: MarkerType.ArrowClosed },
+      ...EDGE_STYLE,
       data: { outcomeKey: '', label: '' },
     })
   }
-
   return edges
 }
 
@@ -121,9 +113,6 @@ function defaultEdges() {
   return buildChainEdges(defaultNodes())
 }
 
-// ============================================================
-// INNER COMPONENT
-// ============================================================
 function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   const { roles } = useDevUser()
   const { fitView } = useReactFlow()
@@ -141,9 +130,10 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [forms, setForms] = useState([])
-  const [defaultPriority, setDefaultPriority] = useState(1)   // NEW
-  const [productId, setProductId] = useState('')       // NEW
-  const [products, setProducts] = useState([])         // NEW
+  const [defaultPriority, setDefaultPriority] = useState(1)
+  const [productId, setProductId] = useState('')
+  const [products, setProducts] = useState([])
+  const [hasChanges, setHasChanges] = useState(false)
 
   const selectedNode = useMemo(
     () => nodes.find((x) => x.id === selectedNodeId),
@@ -155,7 +145,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   )
   const readOnly = definition && definition.status !== 0
 
-  // Only Published forms can be attached to a workflow
   const publishedForms = useMemo(
     () => forms.filter((f) => f.status === 'Published'),
     [forms]
@@ -172,7 +161,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
     }, 50)
   }
 
-  // ---- Load departments ----
   useEffect(() => {
     api('/reference/departments')
       .then((items) => {
@@ -182,27 +170,24 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .catch((err) => setError(err.message))
   }, [isNew])
 
-  // ---- Load available forms ----
   useEffect(() => {
     api('/forms')
       .then((items) => setForms(Array.isArray(items) ? items : []))
       .catch((err) => console.error('Forms load failed:', err))
   }, [])
 
-  // ---- Load categories ----
   useEffect(() => {
     if (!departmentId) return
     api(`/reference/categories?departmentId=${departmentId}`)
       .then((items) => {
         setCategories(items)
-        if (isNew && !items.some((x) => x.id === categoryId)) {
+        if (!items.some((x) => x.id === categoryId)) {
           setCategoryId(items[0]?.id || '')
         }
       })
       .catch((err) => setError(err.message))
   }, [departmentId])
 
-  // ---- Load products when category changes ----
   useEffect(() => {
     if (!categoryId) {
       setProducts([])
@@ -214,7 +199,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       .then((items) => {
         const list = Array.isArray(items) ? items : []
         setProducts(list)
-        // Agar selected product ab category mein nahi hai, toh reset karo
         if (!list.some((x) => x.id === productId)) {
           setProductId(list[0]?.id || '')
         }
@@ -226,7 +210,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       })
   }, [categoryId])
 
-  // ---- Load existing workflow ----
   useEffect(() => {
     if (isNew || !workflowId) return
     setLoading(true)
@@ -237,7 +220,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
         setDefaultPriority(item.defaultPriority ?? 1)
         setDepartmentId(item.departmentId)
         setCategoryId(item.categoryId)
-        setProductId(item.productId || '')       // NEW
+        setProductId(item.productId || '')
         const designer = JSON.parse(item.designerJson || '{}')
         const sourceNodes = read(designer, 'nodes', 'Nodes') || []
         const sourceEdges = read(designer, 'edges', 'Edges') || []
@@ -275,7 +258,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
             source,
             target,
             label,
-            markerEnd: { type: MarkerType.ArrowClosed },
+            ...EDGE_STYLE,
             data: {
               outcomeKey: read(e, 'outcomeKey', 'OutcomeKey') || '',
               label,
@@ -285,11 +268,9 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
 
         const laidOutNodes = applyHorizontalLayout(mappedNodes)
         setNodes(laidOutNodes)
-
         setEdges(
           mappedEdges.length > 0 ? mappedEdges : buildChainEdges(laidOutNodes)
         )
-
         scheduleFitView()
       })
       .catch((err) => setError(err.message))
@@ -303,22 +284,19 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
         addEdge(
           {
             ...params,
-            markerEnd: { type: MarkerType.ArrowClosed },
+            ...EDGE_STYLE,
             data: { outcomeKey: '', label: '' },
           },
           current
         )
       )
+      setHasChanges(true)
     },
     [readOnly, setEdges]
   )
 
-  // ============================================================
-  // ADD HUMAN NODE
-  // ============================================================
   const addHumanNode = () => {
     const id = `step-${crypto.randomUUID().slice(0, 8)}`
-
     setNodes((current) => {
       const next = [
         ...current,
@@ -343,18 +321,14 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       setEdges(buildChainEdges(laidOut))
       return laidOut
     })
-
     setSelectedNodeId(id)
     setSelectedEdgeId('')
+    setHasChanges(true)
     scheduleFitView()
   }
 
-  // ============================================================
-  // ADD END NODE
-  // ============================================================
   const addEndNode = () => {
     const id = `end-${crypto.randomUUID().slice(0, 8)}`
-
     setNodes((current) => {
       const next = [
         ...current,
@@ -362,20 +336,16 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
           id,
           type: 'workflowNode',
           position: { x: LAYOUT.START_X, y: LAYOUT.START_Y },
-          data: {
-            label: 'Completed',
-            nodeType: 2,
-            formId: null,
-          },
+          data: { label: 'Completed', nodeType: 2, formId: null },
         },
       ]
       const laidOut = applyHorizontalLayout(next)
       setEdges(buildChainEdges(laidOut))
       return laidOut
     })
-
     setSelectedNodeId(id)
     setSelectedEdgeId('')
+    setHasChanges(true)
     scheduleFitView()
   }
 
@@ -387,6 +357,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
           : node
       )
     )
+    setHasChanges(true)
   }
 
   const updateSelectedEdge = (patch) => {
@@ -394,13 +365,14 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       current.map((edge) =>
         edge.id === selectedEdgeId
           ? {
-            ...edge,
-            label: patch.label ?? edge.label,
-            data: { ...edge.data, ...patch },
-          }
+              ...edge,
+              label: patch.label ?? edge.label,
+              data: { ...edge.data, ...patch },
+            }
           : edge
       )
     )
+    setHasChanges(true)
   }
 
   const deleteSelection = () => {
@@ -412,90 +384,77 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
         return laidOut
       })
       setSelectedNodeId('')
+      setHasChanges(true)
       scheduleFitView()
     } else if (selectedEdgeId) {
       setEdges((current) => current.filter((x) => x.id !== selectedEdgeId))
       setSelectedEdgeId('')
+      setHasChanges(true)
     }
   }
 
-  // ============================================================
-  // PAYLOAD
-  // ============================================================
   const toPayload = () => ({
     name: name.trim(),
     departmentId,
     categoryId,
     defaultPriority: Number(defaultPriority),
     productId: productId || null,
-
     nodes: nodes.map((node) => ({
       key: node.id,
       name: node.data.label,
       type: Number(node.data.nodeType),
-
       formId:
         Number(node.data.nodeType) === 1
           ? node.data.formId || null
           : null,
-
       roleCode:
         Number(node.data.nodeType) === 1
           ? node.data.roleCode || null
           : null,
-
       slaHours:
         Number(node.data.nodeType) === 1
           ? Number(node.data.slaHours) || null
           : null,
-
       escalationRoleCode:
         Number(node.data.nodeType) === 1
           ? node.data.escalationRoleCode || null
           : null,
-
       x: node.position.x,
       y: node.position.y,
-
       configJson:
         Number(node.data.nodeType) === 1
           ? JSON.stringify({
-            assignmentMode: node.data.assignmentMode || 'queue',
-            sendEmailNotification: !!node.data.sendEmailNotification,
-          })
+              assignmentMode: node.data.assignmentMode || 'queue',
+              sendEmailNotification: !!node.data.sendEmailNotification,
+            })
           : null,
-
       fields:
         Number(node.data.nodeType) === 1
           ? (node.data.fields || []).map((field, index) => ({
-            fieldKey: field.fieldKey,
-            label: field.label,
-            fieldType: field.fieldType,
-            placeholder: field.placeholder || null,
-            isRequired: !!field.isRequired,
-            displayOrder: index,
-            options: field.options || [],
-
-            allowedFileTypes:
-              field.fieldType === 'attachment'
-                ? field.allowedFileTypes || null
-                : null,
-
-            maxFileSizeMb:
-              field.fieldType === 'attachment'
-                ? field.maxFileSizeMb != null
-                  ? Number(field.maxFileSizeMb)
-                  : null
-                : null,
-
-            allowMultiple:
-              field.fieldType === 'attachment'
-                ? !!field.allowMultiple
-                : null,
-          }))
+              fieldKey: field.fieldKey,
+              label: field.label,
+              fieldType: field.fieldType,
+              placeholder: field.placeholder || null,
+              isRequired: !!field.isRequired,
+              displayOrder: index,
+              options: field.options || [],
+              allowedFileTypes:
+                field.fieldType === 'attachment'
+                  ? field.allowedFileTypes || null
+                  : null,
+              maxFileSizeMb:
+                field.fieldType === 'attachment'
+                  ? field.maxFileSizeMb != null
+                    ? Number(field.maxFileSizeMb)
+                    : null
+                  : null,
+              allowMultiple:
+                field.fieldType === 'attachment'
+                  ? !!field.allowMultiple
+                  : null,
+            }))
           : [],
     })),
-
     edges: edges.map((edge) => ({
       sourceKey: edge.source,
       targetKey: edge.target,
@@ -513,10 +472,11 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       const saved = isNew
         ? await api('/workflow-definitions', { method: 'POST', body: payload })
         : await api(`/workflow-definitions/${workflowId}`, {
-          method: 'PUT',
-          body: payload,
-        })
+            method: 'PUT',
+            body: payload,
+          })
       setDefinition(saved)
+      setHasChanges(false)
       if (isNew) navigate(`/workflows/${saved.id}/designer`)
       return saved
     } catch (err) {
@@ -528,11 +488,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   }
 
   const publish = async () => {
-    // ---- Client-side validation before calling API ----
-    const startCount = nodes.filter(
-      (n) => Number(n.data.nodeType) === 0
-    ).length
-
+    const startCount = nodes.filter((n) => Number(n.data.nodeType) === 0).length
     if (startCount !== 1) {
       setError(
         `Workflow must have exactly 1 Start node. Currently: ${startCount}.`
@@ -540,10 +496,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       return
     }
 
-    const endCount = nodes.filter(
-      (n) => Number(n.data.nodeType) === 2
-    ).length
-
+    const endCount = nodes.filter((n) => Number(n.data.nodeType) === 2).length
     if (endCount < 1) {
       setError('Workflow must have at least 1 End node.')
       return
@@ -554,17 +507,28 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
       return
     }
 
-    // Validate attached forms are published
+    const humanCount = nodes.filter((n) => Number(n.data.nodeType) === 1).length
+    if (humanCount < 1) {
+      setError(
+        'Workflow must have at least 1 Human Task between Start and End nodes.'
+      )
+      return
+    }
+
+    if (!productId) {
+      setError('Please select a product for this workflow.')
+      return
+    }
+
     const unpublished = nodes.filter(
       (n) =>
         Number(n.data.nodeType) === 1 &&
         n.data.formId &&
         !publishedForms.some((f) => f.id === n.data.formId)
     )
-
     if (unpublished.length > 0) {
       setError(
-        `Some attached forms are not Published. Please publish them first or detach.`
+        'Some attached forms are not Published. Please publish them first or detach.'
       )
       return
     }
@@ -580,6 +544,7 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
         { method: 'POST' }
       )
       setDefinition(published)
+      setHasChanges(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -613,115 +578,229 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               ← Library
             </button>
             {!readOnly && (
-              <button
-                className="btn btn-primary"
-                disabled={saving}
-                onClick={publish}
-              >
-                {saving ? 'Publishing…' : 'Publish'}
-              </button>
+              <>
+                <button
+                  className="btn btn-secondary"
+                  onClick={save}
+                  disabled={saving}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  {saving ? 'Saving…' : 'Save draft'}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={saving}
+                  onClick={publish}
+                >
+                  {saving ? 'Publishing…' : 'Publish'}
+                </button>
+              </>
             )}
           </div>
         }
       />
       <ErrorBanner message={error} />
 
-      <section className="designer-config panel">
-        <label className="field compact">
-          <span>Workflow name</span>
-          <input
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={readOnly}
-          />
-        </label>
-        <label className="field compact">
-          <span>Department</span>
-          <select
-            className="input"
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-            disabled={readOnly || !isNew}
-          >
-            {departments.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field compact">
-          <span>Complaint category</span>
-          <select
-            className="input"
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            disabled={readOnly || !isNew}
-          >
-            {categories.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      {hasChanges && !readOnly && (
+        <div className="wf-unsaved-banner">
+          <span className="wf-unsaved-dot" />
+          Unsaved changes — click "Save draft" to persist.
+        </div>
+      )}
 
-        <label className="field compact">
-          <span>Product</span>
-          <select
-            className="input"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            disabled={readOnly || !isNew || products.length === 0}
-            required
-          >
-            {products.length === 0 ? (
-              <option value="">No products for this category</option>
-            ) : (
-              products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+      <section className="designer-config panel">
+        <div className="designer-config-grid">
+          <label className="field compact">
+            <span>Workflow name</span>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                setHasChanges(true)
+              }}
+              disabled={readOnly}
+              placeholder="e.g. Credit Card Complaint"
+            />
+          </label>
+
+          <label className="field compact">
+            <span>Department</span>
+            <select
+              className="input"
+              value={departmentId}
+              onChange={(e) => {
+                setDepartmentId(e.target.value)
+                setHasChanges(true)
+              }}
+              disabled={readOnly}
+            >
+              {departments.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
                 </option>
-              ))
-            )}
-          </select>
-        </label>
-        <label className="field compact">
-          <span>Priority</span>
-          <select
-            className="input"
-            value={defaultPriority}
-            onChange={(e) => setDefaultPriority(Number(e.target.value))}
-            disabled={readOnly}
-          >
-            <option value={0}>Low</option>
-            <option value={1}>Normal</option>
-            <option value={2}>High</option>
-            <option value={3}>Critical</option>
-          </select>
-        </label>
+              ))}
+            </select>
+          </label>
+
+          <label className="field compact">
+            <span>Complaint category</span>
+            <select
+              className="input"
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value)
+                setHasChanges(true)
+              }}
+              disabled={readOnly}
+            >
+              {categories.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field compact">
+            <span>Product</span>
+            <select
+              className="input"
+              value={productId}
+              onChange={(e) => {
+                setProductId(e.target.value)
+                setHasChanges(true)
+              }}
+              disabled={readOnly || products.length === 0}
+              required
+            >
+              {products.length === 0 ? (
+                <option value="">No products</option>
+              ) : (
+                products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+
+          <label className="field compact">
+            <span>Default Priority</span>
+            <select
+              className="input"
+              value={defaultPriority}
+              onChange={(e) => {
+                setDefaultPriority(Number(e.target.value))
+                setHasChanges(true)
+              }}
+              disabled={readOnly}
+            >
+              <option value={0}>Low</option>
+              <option value={1}>Normal</option>
+              <option value={2}>High</option>
+              <option value={3}>Critical</option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <div className="designer-shell">
         <aside className="designer-palette panel">
-          <div className="designer-section-title">Steps</div>
-          <button
-            className="palette-item"
-            onClick={addHumanNode}
-            disabled={readOnly}
-          >
-            <strong>+ Human task</strong>
-            <span>Role queue or assigned user</span>
-          </button>
-          <button
-            className="palette-item"
-            onClick={addEndNode}
-            disabled={readOnly}
-          >
-            <strong>+ End state</strong>
-            <span>Resolved / rejected / closed</span>
-          </button>
+          <div className="designer-section-title">Add Steps</div>
+
+          <div className="designer-palette-body">
+            <button
+              className="palette-item"
+              onClick={addHumanNode}
+              disabled={readOnly}
+            >
+              <div className="palette-icon palette-icon--human">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                </svg>
+              </div>
+              <div className="palette-content ">
+                <div>
+                <strong>Human Task</strong>
+
+                </div>
+                <span>Role queue or assigned user</span>
+              </div>
+            </button>
+
+            <button
+              className="palette-item palette-item--end"
+              onClick={addEndNode}
+              disabled={readOnly}
+            >
+              <div className="palette-icon palette-icon--end">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <div className="palette-content">
+                <strong>End State</strong>
+                <span>Resolved / rejected / closed</span>
+              </div>
+            </button>
+          </div>
+
+          <div className="wf-legend-wrapper">
+            <div className="wf-legend-title">Legend</div>
+            <div className="wf-legend">
+              <div className="wf-legend-item">
+                <span className="wf-legend-dot wf-legend-dot--start" />
+                <span>Start</span>
+              </div>
+              <div className="wf-legend-item">
+                <span className="wf-legend-dot wf-legend-dot--human" />
+                <span>Human Task</span>
+              </div>
+              <div className="wf-legend-item">
+                <span className="wf-legend-dot wf-legend-dot--end" />
+                <span>End</span>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <section className="designer-canvas panel">
@@ -750,7 +829,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               nodesDraggable={!readOnly}
               nodesConnectable={!readOnly}
               elementsSelectable
-
               fitView
               fitViewOptions={{
                 padding: VIEW.FIT_PADDING,
@@ -760,19 +838,27 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
               minZoom={VIEW.MIN_ZOOM}
               maxZoom={VIEW.MAX_ZOOM}
               defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-
               panOnDrag={true}
               panOnScroll={true}
               zoomOnScroll={false}
               zoomOnPinch={true}
               zoomOnDoubleClick={false}
               selectionOnDrag={false}
-
               proOptions={{ hideAttribution: true }}
             >
-              <Background gap={22} size={1} />
+              <Background gap={24} size={1} color="#e5e7eb" />
               <Controls />
-              <MiniMap zoomable pannable />
+              <MiniMap
+                zoomable
+                pannable
+                nodeColor={(node) => {
+                  const t = Number(node.data?.nodeType)
+                  if (t === 0) return '#86efac'
+                  if (t === 2) return '#fca5a5'
+                  return '#93c5fd'
+                }}
+                maskColor="rgba(220, 38, 38, 0.05)"
+              />
             </ReactFlow>
           )}
         </section>
@@ -811,7 +897,8 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                 </select>
               </label>
 
-              {selectedNode.data.nodeType === workflowNodeType.HumanTask && (
+              {selectedNode.data.nodeType ===
+                workflowNodeType.HumanTask && (
                 <>
                   <label className="field compact">
                     <span>Assigned role</span>
@@ -875,7 +962,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                     </select>
                   </label>
 
-                  {/* ---------- ATTACHED FORM (only Published) ---------- */}
                   <label className="field compact">
                     <span>Attached Form (optional)</span>
                     <select
@@ -909,7 +995,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                         this step.
                       </div>
                     </div>
-
                     <label className="toggle-switch">
                       <input
                         type="checkbox"
@@ -950,12 +1035,8 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
                 <span>Button / edge label</span>
                 <input
                   className="input"
-                  value={
-                    selectedEdge.data?.label || selectedEdge.label || ''
-                  }
-                  onChange={(e) =>
-                    updateSelectedEdge({ label: e.target.value })
-                  }
+                  value={selectedEdge.data?.label || selectedEdge.label || ''}
+                  onChange={(e) => updateSelectedEdge({ label: e.target.value })}
                   disabled={readOnly}
                   placeholder="e.g. Assign officer"
                 />
@@ -989,7 +1070,22 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
             </div>
           ) : (
             <div className="inspector-empty">
-              Select a node or connection to edit its properties.
+              <div className="inspector-empty-icon">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </div>
+              <div>Select a node or connection to edit its properties.</div>
             </div>
           )}
         </aside>
@@ -998,9 +1094,6 @@ function WorkflowDesignerInner({ workflowId, isNew, navigate }) {
   )
 }
 
-// ============================================================
-// WRAPPER
-// ============================================================
 export default function WorkflowDesignerPage(props) {
   return (
     <ReactFlowProvider>
