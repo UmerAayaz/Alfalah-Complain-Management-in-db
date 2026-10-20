@@ -183,12 +183,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.WorkflowNodeId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        modelBuilder.Entity<WorkflowFieldResponse>()
-            .HasOne(x => x.WorkflowNodeField)
-            .WithMany()
-            .HasForeignKey(x => x.WorkflowNodeFieldId)
-            .OnDelete(DeleteBehavior.NoAction)
-            .IsRequired(false);
 
         modelBuilder.Entity<WorkflowFieldResponse>()
             .HasOne(x => x.LibraryField)

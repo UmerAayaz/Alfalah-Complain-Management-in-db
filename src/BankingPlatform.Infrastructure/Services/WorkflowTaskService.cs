@@ -273,7 +273,7 @@ public sealed class WorkflowTaskService(
 
         var responses = await db.WorkflowFieldResponses
             .AsNoTracking()
-            .Include(x => x.WorkflowNodeField)
+            
             .Include(x => x.LibraryField)
             .Where(x => completedTaskIds.Contains(x.WorkflowTaskId))
             .ToListAsync(cancellationToken);
@@ -302,23 +302,12 @@ public sealed class WorkflowTaskService(
             {
                 var taskResponses = responses
                     .Where(x => x.WorkflowTaskId == previousTask.Id)
-                    .OrderBy(x => x.WorkflowNodeField != null
-                        ? x.WorkflowNodeField.DisplayOrder
-                        : 0)
+                    .OrderBy(x => x.SubmittedAtUtc)
                     .Select(response =>
                     {
-                        var fieldType = response.WorkflowNodeField?.FieldType
-                            ?? response.LibraryField?.FieldType
-                            ?? "text";
-
-                        var fieldKey = response.WorkflowNodeField?.FieldKey
-                            ?? response.LibraryField?.FieldKey
-                            ?? "";
-
-                        var label = response.WorkflowNodeField?.Label
-                            ?? response.LibraryField?.Label
-                            ?? response.Label
-                            ?? "";
+                        var fieldType = response.LibraryField?.FieldType ?? "text";
+var fieldKey = response.LibraryField?.FieldKey ?? "";
+var label = response.LibraryField?.Label ?? response.Label ?? "";
 
                         object? value;
 

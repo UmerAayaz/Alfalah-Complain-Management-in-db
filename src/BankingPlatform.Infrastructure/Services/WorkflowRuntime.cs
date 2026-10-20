@@ -206,7 +206,7 @@ public sealed class SqlWorkflowRuntime(
                 SubmittedAtUtc = DateTime.UtcNow,
 
                 // Set the right FK depending on the source
-                WorkflowNodeFieldId = isFormBased ? null : field.Id,
+                // WorkflowNodeFieldId = isFormBased ? null : field.Id,
                 LibraryFieldId = isFormBased ? field.Id : null,
             };
 

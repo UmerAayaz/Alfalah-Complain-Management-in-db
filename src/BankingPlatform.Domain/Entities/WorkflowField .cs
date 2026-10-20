@@ -59,8 +59,8 @@ public sealed class WorkflowFieldResponse : EntityBase
     public WorkflowNode WorkflowNode { get; set; } = null!;
 
     // Inline field (nullable — form-attached tasks use LibraryFieldId instead)
-    public Guid? WorkflowNodeFieldId { get; set; }
-    public WorkflowNodeField? WorkflowNodeField { get; set; }
+    // // public Guid? WorkflowNodeFieldId { get; set; }
+    // public WorkflowNodeField? WorkflowNodeField { get; set; }
 
     // Library field (nullable — only set when form-attached task)
     public Guid? LibraryFieldId { get; set; }

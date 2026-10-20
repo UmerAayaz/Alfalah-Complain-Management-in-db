@@ -308,16 +308,10 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("CategoryId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
@@ -657,9 +651,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("ValueJson")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("WorkflowNodeFieldId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("WorkflowNodeId")
                         .HasColumnType("uniqueidentifier");
 
@@ -673,8 +664,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.HasIndex("LibraryFieldId");
 
                     b.HasIndex("SubmittedByUserId");
-
-                    b.HasIndex("WorkflowNodeFieldId");
 
                     b.HasIndex("WorkflowNodeId");
 
@@ -1120,11 +1109,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("BankingPlatform.Domain.Entities.WorkflowNodeField", "WorkflowNodeField")
-                        .WithMany()
-                        .HasForeignKey("WorkflowNodeFieldId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("BankingPlatform.Domain.Entities.WorkflowNode", "WorkflowNode")
                         .WithMany()
                         .HasForeignKey("WorkflowNodeId")
@@ -1144,8 +1128,6 @@ namespace BankingPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("SubmittedByUser");
 
                     b.Navigation("WorkflowNode");
-
-                    b.Navigation("WorkflowNodeField");
 
                     b.Navigation("WorkflowTask");
                 });
