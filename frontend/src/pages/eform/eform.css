@@ -18,6 +18,12 @@
   --eform-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --eform-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   --eform-shadow-red: 0 4px 14px rgba(220, 38, 38, 0.25);
+
+  /* Blue for "Latest version" */
+  --eform-blue: #3b82f6;
+  --eform-blue-dark: #2563eb;
+  --eform-blue-light: #eff6ff;
+  --eform-blue-border: #dbeafe;
 }
 
 /* ============================================================
@@ -225,7 +231,7 @@
 }
 
 /* ============================================================
-   SECTION BLOCKS — Same style everywhere
+   SECTION BLOCKS
    ============================================================ */
 .section-block {
   background: #fff;
@@ -382,8 +388,33 @@
   accent-color: var(--eform-red);
 }
 
+.checkbox-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--eform-text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.checkbox-field-inline:hover {
+  background: var(--eform-red-light);
+  color: var(--eform-red);
+}
+
+.checkbox-field-inline input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--eform-red);
+}
+
 /* ============================================================
-   CHIPS (attachment types)
+   CHIPS
    ============================================================ */
 .chip-row {
   display: flex;
@@ -665,35 +696,9 @@
   background: var(--eform-red);
 }
 
-.checkbox-field-inline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--eform-text-muted);
-  cursor: pointer;
-  user-select: none;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s ease;
-}
-
-.checkbox-field-inline:hover {
-  background: var(--eform-red-light);
-  color: var(--eform-red);
-}
-
-.checkbox-field-inline input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--eform-red);
-}
-
 /* ============================================================
-   OPTION BUILDER — Dynamic
+   OPTION BUILDER
    ============================================================ */
-
 .option-count-badge {
   display: inline-flex;
   align-items: center;
@@ -703,7 +708,7 @@
   padding: 0 6px;
   margin-left: 8px;
   border-radius: 11px;
-  background: #dc2626;
+  background: var(--eform-red);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
@@ -723,19 +728,19 @@
   gap: 12px;
   padding: 16px;
   border-radius: 10px;
-  background: #fef2f2;
-  border: 1px dashed #fecaca;
+  background: var(--eform-red-light);
+  border: 1px dashed var(--eform-red-border);
 }
 
 .option-empty-icon {
   font-size: 24px;
-  color: #dc2626;
+  color: var(--eform-red);
   opacity: 0.6;
 }
 
 .option-empty strong {
   display: block;
-  color: #b91c1c;
+  color: var(--eform-red-dark);
   font-size: 13px;
   margin-bottom: 2px;
 }
@@ -749,9 +754,7 @@
   transition: background 0.15s ease;
 }
 
-.option-row:hover {
-  background: #fef2f2;
-}
+.option-row:hover { background: var(--eform-red-light); }
 
 .option-index {
   display: flex;
@@ -761,19 +764,16 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #dc2626;
+  background: var(--eform-red);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
 }
 
-.option-input {
-  flex: 1;
-  margin: 0;
-}
+.option-input { flex: 1; margin: 0; }
 
 .option-input:focus {
-  border-color: #dc2626;
+  border-color: var(--eform-red);
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
@@ -795,9 +795,9 @@
 }
 
 .option-remove-btn:hover {
-  background: #fee2e2;
-  color: #dc2626;
-  border-color: #fecaca;
+  background: var(--eform-red-soft);
+  color: var(--eform-red);
+  border-color: var(--eform-red-border);
 }
 
 .option-add-btn {
@@ -809,9 +809,9 @@
   padding: 8px 16px;
   margin-top: 4px;
   border-radius: 8px;
-  border: 1.5px dashed #dc2626;
+  border: 1.5px dashed var(--eform-red);
   background: transparent;
-  color: #dc2626;
+  color: var(--eform-red);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -819,13 +819,13 @@
 }
 
 .option-add-btn:hover {
-  background: #fef2f2;
+  background: var(--eform-red-light);
   border-style: solid;
 }
+
 /* ============================================================
    FORM USAGE PANEL
    ============================================================ */
-
 .form-usage-section {
   margin-top: 12px;
   padding-top: 16px;
@@ -849,7 +849,6 @@
   color: #9ca3af;
 }
 
-/* Stats row */
 .form-usage-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -865,21 +864,10 @@
   border-left: 3px solid #9ca3af;
 }
 
-.form-usage-stat--workflows {
-  border-left-color: #3b82f6;
-}
-
-.form-usage-stat--stages {
-  border-left-color: #6366f1;
-}
-
-.form-usage-stat--published {
-  border-left-color: #10b981;
-}
-
-.form-usage-stat--draft {
-  border-left-color: #f59e0b;
-}
+.form-usage-stat--workflows { border-left-color: var(--eform-blue); }
+.form-usage-stat--stages { border-left-color: #6366f1; }
+.form-usage-stat--published { border-left-color: #10b981; }
+.form-usage-stat--draft { border-left-color: #f59e0b; }
 
 .form-usage-stat-value {
   font-size: 20px;
@@ -897,7 +885,6 @@
   letter-spacing: 0.4px;
 }
 
-/* Workflow list */
 .form-usage-list {
   display: flex;
   flex-direction: column;
@@ -912,9 +899,7 @@
   transition: border-color 0.15s ease;
 }
 
-.form-usage-workflow:hover {
-  border-color: #d1d5db;
-}
+.form-usage-workflow:hover { border-color: #d1d5db; }
 
 .form-usage-workflow-header {
   display: flex;
@@ -950,7 +935,6 @@
   flex-shrink: 0;
 }
 
-/* Status badge */
 .form-usage-status {
   padding: 3px 9px;
   border-radius: 20px;
@@ -961,22 +945,10 @@
   flex-shrink: 0;
 }
 
-.form-usage-status--draft {
-  background: #fef3c7;
-  color: #92400e;
-}
+.form-usage-status--draft { background: #fef3c7; color: #92400e; }
+.form-usage-status--published { background: #d1fae5; color: #065f46; }
+.form-usage-status--archived { background: #f3f4f6; color: #4b5563; }
 
-.form-usage-status--published {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.form-usage-status--archived {
-  background: #f3f4f6;
-  color: #4b5563;
-}
-
-/* Stages */
 .form-usage-stages {
   display: flex;
   flex-wrap: wrap;
@@ -989,8 +961,8 @@
   gap: 6px;
   padding: 5px 10px;
   border-radius: 6px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  background: var(--eform-blue-light);
+  border: 1px solid var(--eform-blue-border);
   font-size: 11px;
   color: #1e40af;
   font-weight: 500;
@@ -998,12 +970,10 @@
 
 .form-usage-stage-icon {
   display: inline-flex;
-  color: #3b82f6;
+  color: var(--eform-blue);
 }
 
-.form-usage-stage-name {
-  font-weight: 600;
-}
+.form-usage-stage-name { font-weight: 600; }
 
 .form-usage-stage-role {
   padding: 1px 6px;
@@ -1014,18 +984,14 @@
   font-weight: 500;
 }
 
-/* Responsive */
 @media (max-width: 900px) {
-  .form-usage-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .form-usage-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {
-  .form-usage-stats {
-    grid-template-columns: 1fr;
-  }
+  .form-usage-stats { grid-template-columns: 1fr; }
 }
+
 /* ============================================================
    FORMS LIST — Grid + Cards
    ============================================================ */
@@ -1036,6 +1002,7 @@
   gap: 16px;
 }
 
+/* ---------- BASE CARD ---------- */
 .form-card {
   display: flex;
   flex-direction: column;
@@ -1043,39 +1010,43 @@
   padding: 18px;
   border-radius: 12px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 2px solid #e5e7eb;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
 }
 
-.form-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #e5e7eb;
+/* ---------- LATEST VERSION — FULL BLUE BORDER ---------- */
+.form-card--latest {
+  border: 2px solid var(--eform-blue) !important;
+  background: var(--eform-blue-light);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
 }
 
-.form-card--draft::before {
-  background: #f59e0b;
-}
-
-.form-card--published::before {
-  background: #10b981;
-}
-
-.form-card--archived::before {
-  background: #9ca3af;
-}
-
-.form-card:hover {
-  border-color: #fecaca;
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.08);
+.form-card--latest:hover {
+  border-color: var(--eform-blue-dark) !important;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.22);
   transform: translateY(-2px);
+}
+
+/* ---------- OLD + IN USE — FULL RED BORDER ---------- */
+.form-card--old-but-used {
+  border: 2px solid var(--eform-red) !important;
+  background: var(--eform-red-light);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+}
+
+.form-card--old-but-used:hover {
+  border-color: var(--eform-red-dark) !important;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.25);
+  transform: translateY(-2px);
+}
+
+/* ---------- DEFAULT HOVER (old unused / no class) ---------- */
+.form-card:hover:not(.form-card--latest):not(.form-card--old-but-used) {
+  border-color: #d1d5db;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
 /* Header */
@@ -1124,20 +1095,9 @@
   line-height: 1;
 }
 
-.form-status--draft {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.form-status--published {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.form-status--archived {
-  background: #f3f4f6;
-  color: #4b5563;
-}
+.form-status--draft { background: #fef3c7; color: #92400e; }
+.form-status--published { background: #d1fae5; color: #065f46; }
+.form-status--archived { background: #f3f4f6; color: #4b5563; }
 
 /* Description */
 .form-card-description {
@@ -1150,134 +1110,145 @@
   overflow: hidden;
 }
 
-/* Usage section */
-.form-card-usage {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+/* ============ ALERT BANNERS ============ */
+.form-card-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
-.form-card-usage-empty {
+.form-card-alert svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.form-card-alert--danger {
+  background: var(--eform-red-soft);
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-left: 3px solid var(--eform-red);
+}
+
+.form-card-alert--muted {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  border-left: 3px solid #9ca3af;
+}
+
+/* ============ USAGE INDICATOR ============ */
+.form-usage-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   font-size: 12px;
   color: #6b7280;
-  font-style: italic;
 }
 
-.form-card-usage-empty svg {
-  flex-shrink: 0;
+.form-usage-indicator--active {
+  background: var(--eform-red-light);
+  border-color: var(--eform-red-border);
+  color: var(--eform-red-dark);
+}
+
+.form-usage-indicator--active svg {
+  color: var(--eform-red);
+}
+
+.form-usage-indicator strong { font-weight: 600; }
+
+.form-usage-stage-count {
   color: #9ca3af;
+  font-weight: 400;
 }
 
-.form-card-usage-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #1e40af;
-  margin-bottom: 8px;
-}
-
-.form-card-usage-title svg {
-  flex-shrink: 0;
-}
-
-.form-card-usage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-card-usage-item {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #ffffff;
-  border: 1px solid #e0e7ff;
-}
-
-.form-card-usage-workflow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.form-card-usage-workflow-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: #1e3a8a;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.form-card-usage-workflow-status {
+/* ============ VERSION TAGS ============ */
+.form-version-tag {
+  display: inline-block;
   padding: 1px 6px;
+  margin-left: 6px;
   border-radius: 4px;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  flex-shrink: 0;
 }
 
-.form-card-usage-workflow-status--draft {
-  background: #fef3c7;
-  color: #92400e;
+.form-version-tag--latest {
+  background: var(--eform-blue-border);
+  color: #1e40af;
 }
 
-.form-card-usage-workflow-status--published {
-  background: #d1fae5;
-  color: #065f46;
+.form-version-tag--danger {
+  background: var(--eform-red-soft);
+  color: #991b1b;
 }
 
-.form-card-usage-workflow-status--archived {
+.form-version-tag--old {
   background: #f3f4f6;
-  color: #4b5563;
-}
-
-.form-card-usage-stage {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  font-size: 10px;
-}
-
-.form-card-usage-stage-label {
   color: #6b7280;
-  font-weight: 500;
 }
 
-.form-card-usage-stage-name {
-  color: #3b82f6;
-  font-weight: 600;
+/* ============ HOVER TOOLTIP ============ */
+.form-hover-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  right: 10px;
+  z-index: 100;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid var(--eform-red);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);
+  font-size: 12px;
+  color: #111827;
+  pointer-events: none;
 }
 
-.form-card-usage-role {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #f3f4f6;
-  color: #4b5563;
-  font-size: 9px;
-  font-weight: 600;
+.form-hover-tooltip strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--eform-red);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.form-card-usage-more {
-  font-size: 10px;
-  color: #3b82f6;
+.form-hover-tooltip ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-hover-tooltip li {
+  padding: 4px 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.form-hover-tooltip li:first-child { border-top: none; }
+
+.tooltip-workflow-name {
+  display: block;
   font-weight: 600;
-  text-align: center;
-  padding: 4px;
+  color: #111827;
+}
+
+.tooltip-workflow-stages {
+  display: block;
+  color: #6b7280;
+  font-size: 11px;
+  margin-top: 2px;
 }
 
 /* Footer */
@@ -1288,6 +1259,7 @@
   gap: 8px;
   padding-top: 8px;
   border-top: 1px solid #f3f4f6;
+  flex-wrap: wrap;
 }
 
 .form-card-chip {
@@ -1303,20 +1275,18 @@
   color: #6b7280;
 }
 
-/* In-use stat card */
-.wf-stat--used {
-  border-left-color: #3b82f6;
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-}
 .form-card-actions {
   display: flex;
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* ============ STATS CARDS ============ */
+.wf-stat--latest { border-left-color: var(--eform-blue); }
+.wf-stat--old-used { border-left-color: var(--eform-red); }
+.wf-stat--used { border-left-color: var(--eform-blue); }
+
+@media (max-width: 900px) {
+  .form-grid { grid-template-columns: 1fr; }
 }

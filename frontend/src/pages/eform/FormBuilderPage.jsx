@@ -153,7 +153,7 @@ export default function FormBuilderPage({ formId, isNew, navigate }) {
     const next = [...selectedFields]
     const target = index + direction
     if (target < 0 || target >= next.length) return
-    ;[next[index], next[target]] = [next[target], next[index]]
+      ;[next[index], next[target]] = [next[target], next[index]]
     setSelectedFields(next)
   }
 
@@ -315,10 +315,35 @@ export default function FormBuilderPage({ formId, isNew, navigate }) {
             )}
 
             {isPublished && (
-              <span className="form-status form-status--published">
-                <span className="form-status-dot">●</span>
-                Published
-              </span>
+              <>
+                <span className="form-status form-status--published">
+                  <span className="form-status-dot">●</span>
+                  Published
+                </span>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        'Create a new version of this form? The current version will remain active in existing workflows.'
+                      )
+                    )
+                      return
+
+                    try {
+                      const created = await api(`/forms/${formId}/new-version`, {
+                        method: 'POST',
+                      })
+                      window.alert(`New version v${created.version} created!`)
+                      navigate(`/forms/${created.id}`)
+                    } catch (err) {
+                      alert(`Create version failed: ${err.message}`)
+                    }
+                  }}
+                >
+                  + Create New Version
+                </button>
+              </>
             )}
           </div>
         }

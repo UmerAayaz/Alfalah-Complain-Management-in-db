@@ -31,59 +31,36 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString()
 }
 
-// ============================================================
-// FIX 1: Robust field count (multiple fallbacks)
-// ============================================================
-function getFieldCount(form) {
-  if (!form) return 0
-  if (Array.isArray(form.fields)) return form.fields.length
-  if (typeof form.fieldCount === 'number') return form.fieldCount
-  if (typeof form.fieldsCount === 'number') return form.fieldsCount
-  return 0
-}
+function parseWorkflowUsage(workflows, formId) {
+  const result = { workflows: [], totalStages: 0 }
+  if (!formId) return result
 
-// ============================================================
-// FIX 2: Parse workflows — FormId check only (NO nodeType)
-// ============================================================
-function buildFormUsageMap(workflows) {
-  const usageMap = {}
+  const targetFormId = formId.toLowerCase()
 
   workflows.forEach((w) => {
     try {
       const designer = JSON.parse(w.designerJson || '{}')
       const nodes = designer.Nodes || designer.nodes || []
-
-      nodes.forEach((node) => {
-        const formId = node.FormId || node.formId
-        if (!formId) return
-
-        const key = formId.toLowerCase()
-        if (!usageMap[key]) {
-          usageMap[key] = []
-        }
-
-        // Skip duplicates (same workflow + stage)
-        const alreadyExists = usageMap[key].some(
-          (u) => u.workflowId === w.id && u.stageName === (node.Name || node.name)
-        )
-        if (alreadyExists) return
-
-        usageMap[key].push({
+      const matching = nodes.filter((n) => {
+        const fid = (n.FormId || n.formId || '').toLowerCase()
+        return fid === targetFormId
+      })
+      if (matching.length > 0) {
+        result.totalStages += matching.length
+        result.workflows.push({
           workflowId: w.id,
           workflowName: w.name,
           workflowStatus: w.status,
           workflowVersion: w.version,
-          stageName: node.Name || node.name || 'Untitled stage',
-          roleCode: node.RoleCode || node.roleCode || null,
-          nodeType: Number(node.Type ?? node.type ?? -1),
+          stageNames: matching.map((n) => n.Name || n.name || 'Untitled'),
         })
-      })
-    } catch (err) {
-      console.warn('Could not parse workflow', w.id, err)
+      }
+    } catch {
+      // ignore
     }
   })
 
-  return usageMap
+  return result
 }
 
 // ============================================================
@@ -95,6 +72,7 @@ export default function FormsListPage({ navigate }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [hoveredFormId, setHoveredFormId] = useState(null)
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -109,10 +87,6 @@ export default function FormsListPage({ navigate }) {
         api('/forms'),
         api('/workflow-definitions').catch(() => []),
       ])
-
-      // DEBUG — check karo console mein
-      console.log('FORMS FROM API:', formsData)
-
       setForms(Array.isArray(formsData) ? formsData : [])
       setWorkflows(Array.isArray(wfs) ? wfs : [])
       setError('')
@@ -129,12 +103,85 @@ export default function FormsListPage({ navigate }) {
   }, [])
 
   // ============================================================
-  // USAGE MAP
+  // FORM USAGE MAP
   // ============================================================
-  const usageMap = useMemo(() => buildFormUsageMap(workflows), [workflows])
+  const usageMap = useMemo(() => {
+    const map = {}
+    forms.forEach((f) => {
+      map[f.id.toLowerCase()] = parseWorkflowUsage(workflows, f.id)
+    })
+    return map
+  }, [forms, workflows])
 
   // ============================================================
-  // PUBLISH FROM LIST
+  // VERSION GROUPING — kaunsa latest hai per FormKey
+  // ============================================================
+  const latestByKey = useMemo(() => {
+    const map = {}
+    forms.forEach((f) => {
+      const key = f.formKey || f.id
+      if (!map[key] || (f.version || 0) > (map[key].version || 0)) {
+        map[key] = f
+      }
+    })
+    return map
+  }, [forms])
+
+  // ============================================================
+  // FILTER
+  // ============================================================
+const filtered = useMemo(() => {
+  return forms.filter((f) => {
+    // Filter old-unused forms (hide them completely)
+    const key = f.formKey || f.id
+    const latest = latestByKey[key]
+    const isLatest = latest?.id === f.id
+    const usage = usageMap[f.id.toLowerCase()] || { workflows: [] }
+    const inUse = usage.workflows.length > 0
+
+    // Old + unused → hide
+    if (!isLatest && !inUse) return false
+
+    if (search && !f.name?.toLowerCase().includes(search.toLowerCase()))
+      return false
+    if (filterStatus && f.status !== filterStatus) return false
+    return true
+  })
+}, [forms, search, filterStatus, latestByKey, usageMap])
+
+  // ============================================================
+  // STATS
+  // ============================================================
+  const stats = useMemo(() => {
+  let latestCount = 0
+  let oldButUsedCount = 0
+  let visibleTotal = 0
+
+  forms.forEach((f) => {
+    const key = f.formKey || f.id
+    const isLatest = latestByKey[key]?.id === f.id
+    const usage = usageMap[f.id.toLowerCase()] || { workflows: [] }
+    const inUse = usage.workflows.length > 0
+
+    if (isLatest) {
+      latestCount++
+      visibleTotal++
+    } else if (inUse) {
+      oldButUsedCount++
+      visibleTotal++
+    }
+    // old-unused → not counted
+  })
+
+  return {
+    total: visibleTotal,
+    latestCount,
+    oldButUsedCount,
+  }
+}, [forms, usageMap, latestByKey])
+
+  // ============================================================
+  // ACTIONS
   // ============================================================
   const publishForm = async (form) => {
     if (
@@ -150,44 +197,33 @@ export default function FormsListPage({ navigate }) {
       window.alert('Form published successfully!')
       await load()
     } catch (err) {
-      if (err.message.includes('404') || err.message.includes('not found')) {
-        alert(
-          'Publish endpoint not found on backend. Please add POST /api/forms/{id}/publish'
-        )
-      } else {
-        alert(`Publish failed: ${err.message}`)
-      }
+      alert(`Publish failed: ${err.message}`)
     } finally {
       setBusyId('')
     }
   }
 
-  // ============================================================
-  // FILTER
-  // ============================================================
-  const filtered = useMemo(() => {
-    return forms.filter((f) => {
-      if (search && !f.name?.toLowerCase().includes(search.toLowerCase()))
-        return false
-      if (filterStatus && f.status !== filterStatus) return false
-      return true
-    })
-  }, [forms, search, filterStatus])
+  const createNewVersion = async (form) => {
+    if (
+      !window.confirm(
+        `Create a new version of "${form.name}"? A new Draft version will be created.`
+      )
+    )
+      return
 
-  // ============================================================
-  // STATS
-  // ============================================================
-  const stats = useMemo(
-    () => ({
-      total: forms.length,
-      published: forms.filter((f) => f.status === 'Published').length,
-      draft: forms.filter((f) => f.status === 'Draft').length,
-      inUse: forms.filter(
-        (f) => (usageMap[f.id.toLowerCase()] || []).length > 0
-      ).length,
-    }),
-    [forms, usageMap]
-  )
+    setBusyId(form.id)
+    try {
+      const created = await api(`/forms/${form.id}/new-version`, {
+        method: 'POST',
+      })
+      window.alert(`New version v${created.version} created!`)
+      navigate(`/forms/${created.id}`)
+    } catch (err) {
+      alert(`Create version failed: ${err.message}`)
+    } finally {
+      setBusyId('')
+    }
+  }
 
   // ============================================================
   // RENDER
@@ -218,27 +254,23 @@ export default function FormsListPage({ navigate }) {
 
       <ErrorBanner message={error} />
 
-      {/* ============ STATS ============ */}
+      {/* STATS */}
       <div className="wf-stats">
-        <div className="wf-stat">
-          <span className="wf-stat-label">Total</span>
-          <strong className="wf-stat-value">{stats.total}</strong>
-        </div>
-        <div className="wf-stat wf-stat--published">
-          <span className="wf-stat-label">Published</span>
-          <strong className="wf-stat-value">{stats.published}</strong>
-        </div>
-        <div className="wf-stat wf-stat--draft">
-          <span className="wf-stat-label">Draft</span>
-          <strong className="wf-stat-value">{stats.draft}</strong>
-        </div>
-        <div className="wf-stat wf-stat--used">
-          <span className="wf-stat-label">In Use</span>
-          <strong className="wf-stat-value">{stats.inUse}</strong>
-        </div>
-      </div>
+  <div className="wf-stat">
+    <span className="wf-stat-label">Total Visible</span>
+    <strong className="wf-stat-value">{stats.total}</strong>
+  </div>
+  <div className="wf-stat wf-stat--latest">
+    <span className="wf-stat-label">Latest</span>
+    <strong className="wf-stat-value">{stats.latestCount}</strong>
+  </div>
+  <div className="wf-stat wf-stat--old-used">
+    <span className="wf-stat-label">Old · In Use</span>
+    <strong className="wf-stat-value">{stats.oldButUsedCount}</strong>
+  </div>
+</div>
 
-      {/* ============ FILTERS ============ */}
+      {/* FILTERS */}
       <div className="wf-filters">
         <input
           className="input wf-search"
@@ -246,7 +278,6 @@ export default function FormsListPage({ navigate }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-
         <select
           className="input"
           value={filterStatus}
@@ -257,7 +288,6 @@ export default function FormsListPage({ navigate }) {
           <option value="Published">Published</option>
           <option value="Archived">Archived</option>
         </select>
-
         {(search || filterStatus) && (
           <button
             className="btn btn-secondary btn-sm"
@@ -271,7 +301,7 @@ export default function FormsListPage({ navigate }) {
         )}
       </div>
 
-      {/* ============ LIST ============ */}
+      {/* LIST */}
       {loading ? (
         <div className="loading-block">Loading forms…</div>
       ) : filtered.length === 0 ? (
@@ -293,25 +323,45 @@ export default function FormsListPage({ navigate }) {
         <div className="form-grid">
           {filtered.map((form) => {
             const statusMeta = getStatusMeta(form.status)
-            const usage = usageMap[form.id.toLowerCase()] || []
-            const uniqueWorkflows = new Set(usage.map((u) => u.workflowId)).size
-            const fieldCount = getFieldCount(form)
-            const isDraft = form.status === 'Draft'
+            const usage = usageMap[form.id.toLowerCase()] || {
+              workflows: [],
+              totalStages: 0,
+            }
+            const inUse = usage.workflows.length > 0
+            const latestForKey = latestByKey[form.formKey || form.id]
+            const isLatest = latestForKey?.id === form.id
+            const isOldVersion = !isLatest
             const isBusy = busyId === form.id
+            const isHovered = hoveredFormId === form.id
 
             return (
               <article
                 key={form.id}
-                className={`form-card form-card--${statusMeta.key}`}
+                className={`form-card form-card--${statusMeta.key} ${
+                  inUse ? 'form-card--in-use' : ''
+                } ${isOldVersion ? 'form-card--old-version' : ''}`}
                 onClick={() => navigate(`/forms/${form.id}`)}
+                onMouseEnter={() => setHoveredFormId(form.id)}
+                onMouseLeave={() => setHoveredFormId(null)}
               >
                 {/* HEADER */}
                 <div className="form-card-header">
                   <div className="form-card-titles">
                     <div className="form-card-name">{form.name}</div>
                     <div className="form-card-meta">
-                      {fieldCount} field{fieldCount !== 1 ? 's' : ''}
-                      {form.version > 1 ? ` · v${form.version}` : ''}
+                      v{form.version}
+                      {isLatest && form.formKey && (
+                        <span className="form-version-tag form-version-tag--latest">
+                          Latest
+                        </span>
+                      )}
+                      {isOldVersion && (
+                        <span className="form-version-tag form-version-tag--old">
+                          Superseded
+                        </span>
+                      )}
+                      {form.fields?.length > 0 &&
+                        ` · ${form.fields.length} fields`}
                     </div>
                   </div>
                   <span
@@ -329,10 +379,38 @@ export default function FormsListPage({ navigate }) {
                   </div>
                 )}
 
-                {/* USAGE */}
-                <div className="form-card-usage">
-                  {usage.length === 0 ? (
-                    <div className="form-card-usage-empty">
+                {/* USAGE INDICATOR */}
+                <div
+                  className={`form-usage-indicator ${
+                    inUse ? 'form-usage-indicator--active' : ''
+                  }`}
+                >
+                  {inUse ? (
+                    <>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                      </svg>
+                      <strong>
+                        Used in {usage.workflows.length} workflow
+                        {usage.workflows.length !== 1 ? 's' : ''}
+                      </strong>
+                      <span className="form-usage-stage-count">
+                        · {usage.totalStages} stage
+                        {usage.totalStages !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <>
                       <svg
                         width="14"
                         height="14"
@@ -347,125 +425,83 @@ export default function FormsListPage({ navigate }) {
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span>Not used in any workflow yet</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="form-card-usage-title">
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                        </svg>
-                        Used in {uniqueWorkflows} workflow
-                        {uniqueWorkflows !== 1 ? 's' : ''} ·
-                         {/* {usage.length} stage
-                        {usage.length !== 1 ? 's' : ''} */}
-                      </div>
-                      <div className="form-card-usage-list">
-                        {usage.slice(0, 4).map((u, idx) => {
-                          const wfStatus = getStatusMeta(
-                            u.workflowStatus === 0
-                              ? 'Draft'
-                              : u.workflowStatus === 1
-                              ? 'Published'
-                              : 'Archived'
-                          )
-                          return (
-                            <div
-                              className="form-card-usage-item"
-                              key={`${u.workflowId}-${idx}`}
-                            >
-                              <div className="form-card-usage-workflow">
-                                <span className="form-card-usage-workflow-name">
-                                  {u.workflowName}
-                                </span>
-                                <span
-                                  className={`form-card-usage-workflow-status form-card-usage-workflow-status--${wfStatus.key}`}
-                                >
-                                  {wfStatus.label}
-                                </span>
-                              </div>
-                              <div className="form-card-usage-stage">
-                                <span className="form-card-usage-stage-label">
-                                  Stage:
-                                </span>
-                                <span className="form-card-usage-stage-name">
-                                  {u.stageName}
-                                </span>
-                                {u.roleCode && (
-                                  <span className="form-card-usage-role">
-                                    {u.roleCode}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                        {usage.length > 4 && (
-                          <div className="form-card-usage-more">
-                            + {usage.length - 4} more stage
-                            {usage.length - 4 !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                      </div>
+                      <span>Not used in any workflow</span>
                     </>
                   )}
                 </div>
 
+                {/* HOVER TOOLTIP — WORKFLOWS */}
+                {isHovered && inUse && (
+                  <div className="form-hover-tooltip">
+                    <strong>Used in:</strong>
+                    <ul>
+                      {usage.workflows.slice(0, 5).map((w) => (
+                        <li key={w.workflowId}>
+                          <span className="tooltip-workflow-name">
+                            {w.workflowName}
+                          </span>
+                          <span className="tooltip-workflow-stages">
+                            {w.stageNames.join(', ')}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* FOOTER */}
                 <div className="form-card-footer">
-  <span className="form-card-chip">
-    🕒 {timeAgo(form.createdAtUtc || form.updatedAtUtc)}
-  </span>
-  <div className="form-card-actions">
-    {/* Draft: only Edit + Publish */}
-    {isDraft && (
-      <>
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/forms/${form.id}`)
-          }}
-        >
-          Edit
-        </button>
-        <button
-          className="btn btn-primary btn-sm"
-          disabled={isBusy}
-          onClick={(e) => {
-            e.stopPropagation()
-            publishForm(form)
-          }}
-        >
-          {isBusy ? 'Publishing…' : 'Publish'}
-        </button>
-      </>
-    )}
+                  <span className="form-card-chip">
+                    🕒 {timeAgo(form.createdAtUtc || form.updatedAtUtc)}
+                  </span>
+                  <div className="form-card-actions">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/forms/${form.id}`)
+                      }}
+                    >
+                      Open
+                    </button>
 
-    {/* Published/Archived: only Open */}
-    {!isDraft && (
-      <button
-        className="btn btn-secondary btn-sm"
-        onClick={(e) => {
-          e.stopPropagation()
-          navigate(`/forms/${form.id}`)
-        }}
-      >
-        Open
-      </button>
-    )}
-  </div>
+                    {form.status === 'Draft' && (
+                      <>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/forms/${form.id}`)
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          disabled={isBusy}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            publishForm(form)
+                          }}
+                        >
+                          {isBusy ? 'Publishing…' : 'Publish'}
+                        </button>
+                      </>
+                    )}
 
+                    {form.status === 'Published' && isLatest && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={isBusy}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          createNewVersion(form)
+                        }}
+                      >
+                        {isBusy ? 'Creating…' : '+ New Version'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             )
