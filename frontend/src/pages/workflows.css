@@ -154,3 +154,35 @@
   width: 100%;
   padding-left: 36px;
 }
+/* ============================================================
+   LATEST WORKFLOW — BLUE HIGHLIGHT
+   ============================================================ */
+
+.data-table tbody tr.wf-row--latest td {
+  background: #f8fbff;
+}
+
+.data-table tbody tr.wf-row--latest td:first-child {
+  border-left: 3px solid #3b82f6;
+  padding-left: 15px;
+}
+
+.data-table tbody tr.wf-row--latest:hover td {
+  background: #eff6ff;
+}
+
+.wf-latest-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
+}

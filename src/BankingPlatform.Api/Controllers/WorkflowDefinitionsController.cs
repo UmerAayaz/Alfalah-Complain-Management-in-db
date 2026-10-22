@@ -34,4 +34,21 @@ public sealed class WorkflowDefinitionsController(IWorkflowDefinitionService ser
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<WorkflowDefinitionDto>>> List([FromQuery] Guid? categoryId, CancellationToken cancellationToken)
         => Ok(await service.ListAsync(categoryId, cancellationToken));
+
+    [HttpPost("migrate-form")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
+public async Task<ActionResult<MigrateFormResult>> MigrateForm(
+    [FromBody] MigrateFormRequest request,
+    CancellationToken ct = default)
+{
+    try
+    {
+        var result = await service.MigrateFormAsync(request, ct);
+        return Ok(result);
+    }
+    catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
+    catch (ArgumentException ex) { return BadRequest(ex.Message); }
+}
 }

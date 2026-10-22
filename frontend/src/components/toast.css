@@ -1,0 +1,419 @@
+/* ============================================================
+   TOAST NOTIFICATIONS — RED & WHITE THEME
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: 420px;
+  width: calc(100% - 40px);
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15),
+              0 2px 8px rgba(15, 23, 42, 0.08);
+  border-left: 4px solid #6b7280;
+  pointer-events: auto;
+  animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  margin-top: -2px;
+}
+
+.toast-close:hover {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+/* ============================================================
+   TOAST VARIANTS — RED & WHITE
+   ============================================================ */
+
+/* Success — uses green tick but red theme accent kept neutral */
+.toast--success { border-left-color: #dc2626; }
+.toast--success .toast-icon { background: #fee2e2; color: #991b1b; }
+
+/* Error — red */
+.toast--error { border-left-color: #ef4444; }
+.toast--error .toast-icon { background: #fee2e2; color: #dc2626; }
+
+/* Warning — soft red */
+.toast--warning { border-left-color: #fca5a5; }
+.toast--warning .toast-icon { background: #fef2f2; color: #b91c1c; }
+
+/* Info — red accent */
+.toast--info { border-left-color: #dc2626; }
+.toast--info .toast-icon { background: #fee2e2; color: #b91c1c; }
+
+@media (max-width: 640px) {
+  .toast-container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* ============================================================
+   CONFIRM DIALOG — RED & WHITE THEME
+   ============================================================ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2001;
+  padding: 20px;
+  animation: confirmFadeIn 0.15s ease-out;
+}
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.confirm-dialog {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.4),
+              0 0 0 1px rgba(220, 38, 38, 0.08);
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 26px 22px;
+  animation: confirmSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+  position: relative;
+  border-top: 4px solid #dc2626;
+}
+
+@keyframes confirmSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Icon */
+.confirm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.confirm-icon--primary {
+  background: #fee2e2;
+  color: #dc2626;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2);
+}
+
+.confirm-icon--danger {
+  background: #fee2e2;
+  color: #dc2626;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
+}
+
+/* Title */
+.confirm-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+
+/* Content */
+.confirm-content {
+  flex: 1;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.55;
+  margin-bottom: 20px;
+  max-height: 45vh;
+}
+
+.confirm-content::-webkit-scrollbar { width: 6px; }
+
+.confirm-content::-webkit-scrollbar-thumb {
+  background: #fecaca;
+  border-radius: 6px;
+}
+
+.confirm-content::-webkit-scrollbar-thumb:hover {
+  background: #dc2626;
+}
+
+/* Actions */
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.confirm-actions .btn {
+  min-width: 120px;
+  padding: 10px 18px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+  border: 1px solid #ef4444;
+  transition: all 0.15s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Primary button — override to red theme */
+.confirm-actions .btn-primary {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.confirm-actions .btn-primary:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+/* Secondary — white with red outline */
+.confirm-actions .btn-secondary {
+  background: #ffffff;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.confirm-actions .btn-secondary:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+/* ============================================================
+   MIGRATION MODAL CONTENT — RED THEME
+   ============================================================ */
+
+/* Version diff row */
+.migrate-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.migrate-version-from {
+  color: #991b1b;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.migrate-version-arrow {
+  color: #dc2626;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.migrate-version-to {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* Section */
+.migrate-section {
+  margin-bottom: 14px;
+}
+
+.migrate-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #991b1b;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.migrate-section-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+/* Workflow list */
+.migrate-workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.migrate-workflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-left: 3px solid #dc2626;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #1f2937;
+}
+
+.migrate-workflow-item strong {
+  color: #111827;
+  font-weight: 700;
+}
+
+.migrate-workflow-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.migrate-workflow-badge--published {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.migrate-workflow-badge--draft {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.migrate-workflow-badge--archived {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+/* Impact list */
+.migrate-impact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #fef2f2;
+  border: 1px dashed #fecaca;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: #4b5563;
+}
+
+.migrate-impact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.migrate-impact-item::before {
+  content: '▸';
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}

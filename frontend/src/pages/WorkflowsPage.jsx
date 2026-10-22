@@ -47,10 +47,7 @@ export default function WorkflowsPage({ navigate }) {
   // ============================================================
   const filteredWorkflows = useMemo(() => {
     return workflows.filter((w) => {
-      if (
-        search &&
-        !w.name?.toLowerCase().includes(search.toLowerCase())
-      )
+      if (search && !w.name?.toLowerCase().includes(search.toLowerCase()))
         return false
       if (filterCategory && w.categoryId !== filterCategory) return false
       if (filterStatus !== '' && String(w.status) !== filterStatus)
@@ -58,6 +55,20 @@ export default function WorkflowsPage({ navigate }) {
       return true
     })
   }, [workflows, search, filterCategory, filterStatus])
+
+  // ============================================================
+  // ✅ NEW — LATEST VERSION PER CATEGORY
+  // ============================================================
+  const latestWorkflowByKey = useMemo(() => {
+    const map = {}
+    workflows.forEach((w) => {
+      const key = w.categoryId || w.id
+      if (!map[key] || (w.version || 0) > (map[key].version || 0)) {
+        map[key] = w
+      }
+    })
+    return map
+  }, [workflows])
 
   const {
     page,
@@ -183,7 +194,7 @@ export default function WorkflowsPage({ navigate }) {
         </div>
       </div>
 
-      {/* ============ FILTERS — ONE LINE ============ */}
+      {/* ============ FILTERS ============ */}
       <div className="wf-filters">
         <div className="wf-search-wrap">
           <svg
@@ -292,10 +303,19 @@ export default function WorkflowsPage({ navigate }) {
                       PRIORITY_COLORS[item.defaultPriority ?? 1] ||
                       'priority-normal'
 
+                    const isLatest =
+                      latestWorkflowByKey[item.categoryId || item.id]?.id === item.id
+
                     return (
-                      <tr key={item.id}>
+                      <tr
+                        key={item.id}
+                        className={isLatest ? 'wf-row--latest' : ''}
+                      >
                         <td>
                           <strong>{item.name}</strong>
+                          {isLatest && (
+                            <span className="wf-latest-badge">Latest</span>
+                          )}
                           <div className="wf-row-sub">
                             <span
                               className={`wf-priority ${priorityClass}`}
@@ -303,22 +323,22 @@ export default function WorkflowsPage({ navigate }) {
                               {priority}
                             </span>
                             <span className="wf-row-meta">
-  <svg
-    width="11"
-    height="11"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ marginRight: 4, verticalAlign: 'middle' }}
-  >
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-  {timeAgo(item.publishedAtUtc || item.createdAtUtc)}
-</span>
+                              <svg
+                                width="11"
+                                height="11"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ marginRight: 4, verticalAlign: 'middle' }}
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              {timeAgo(item.publishedAtUtc || item.createdAtUtc)}
+                            </span>
                           </div>
                         </td>
 

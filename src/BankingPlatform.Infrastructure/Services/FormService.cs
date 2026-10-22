@@ -14,24 +14,53 @@ public sealed class FormService(
     // ============================================================
     // LIST
     // ============================================================
-    public async Task<IReadOnlyList<FormListItemDto>> ListAsync(CancellationToken ct)
-    {
-        var forms = await db.Forms
-            .AsNoTracking()
-            .Include(x => x.Fields)
-            .OrderBy(x => x.Name)
-            .ThenByDescending(x => x.Version)
-            .ToListAsync(ct);
+    // public async Task<IReadOnlyList<FormListItemDto>> ListAsync(CancellationToken ct)
+    // {
+    //     var forms = await db.Forms
+    //         .AsNoTracking()
+    //         .Include(x => x.Fields)
+    //         .OrderBy(x => x.Name)
+    //         .ThenByDescending(x => x.Version)
+    //         .ToListAsync(ct);
 
-        return forms
+    //     return forms
+    //         .GroupBy(x => x.FormKey)
+    //         .Select(g => g.First())
+    //         .Select(f => new FormListItemDto(
+    //             f.Id, f.FormKey, f.Version, f.Name, f.Status,
+    //             f.PublishedAtUtc, f.CreatedAtUtc, f.Fields.Count))
+    //         .ToList();
+    // }
+
+    // ============================================================
+// LIST
+// ============================================================
+public async Task<IReadOnlyList<FormListItemDto>> ListAsync(
+    bool includeAllVersions = false,
+    CancellationToken ct = default)
+{
+    var forms = await db.Forms
+        .AsNoTracking()
+        .Include(x => x.Fields)
+        .OrderBy(x => x.FormKey)
+        .ThenByDescending(x => x.Version)
+        .ToListAsync(ct);
+
+    IEnumerable<Form> selected = forms;
+
+    if (!includeAllVersions)
+    {
+        selected = forms
             .GroupBy(x => x.FormKey)
-            .Select(g => g.First())
-            .Select(f => new FormListItemDto(
-                f.Id, f.FormKey, f.Version, f.Name, f.Status,
-                f.PublishedAtUtc, f.CreatedAtUtc, f.Fields.Count))
-            .ToList();
+            .Select(g => g.First());
     }
 
+    return selected
+        .Select(f => new FormListItemDto(
+            f.Id, f.FormKey, f.Version, f.Name, f.Status,
+            f.PublishedAtUtc, f.CreatedAtUtc, f.Fields.Count))
+        .ToList();
+}
     // ============================================================
     // GET
     // ============================================================

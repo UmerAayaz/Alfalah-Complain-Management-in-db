@@ -1,5 +1,8 @@
 /* ============================================================
-   E-FORM — RED & WHITE THEME
+   E-FORM — RED & WHITE THEME (FINAL v5)
+   Card (no warning) = RED
+   Card (with warning) = YELLOW
+   Latest badge + Usage indicator = RED
    ============================================================ */
 
 :root {
@@ -19,11 +22,11 @@
   --eform-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   --eform-shadow-red: 0 4px 14px rgba(220, 38, 38, 0.25);
 
-  /* Blue for "Latest version" */
-  --eform-blue: #3b82f6;
-  --eform-blue-dark: #2563eb;
-  --eform-blue-light: #eff6ff;
-  --eform-blue-border: #dbeafe;
+  --eform-yellow: #f59e0b;
+  --eform-yellow-dark: #d97706;
+  --eform-yellow-light: #fffbeb;
+  --eform-yellow-soft: #fef3c7;
+  --eform-yellow-border: #fcd34d;
 }
 
 /* ============================================================
@@ -136,7 +139,7 @@
 }
 
 /* ============================================================
-   MODAL
+   MODAL (generic)
    ============================================================ */
 .modal-wide {
   max-width: 760px;
@@ -864,7 +867,7 @@
   border-left: 3px solid #9ca3af;
 }
 
-.form-usage-stat--workflows { border-left-color: var(--eform-blue); }
+.form-usage-stat--workflows { border-left-color: var(--eform-red); }
 .form-usage-stat--stages { border-left-color: #6366f1; }
 .form-usage-stat--published { border-left-color: #10b981; }
 .form-usage-stat--draft { border-left-color: #f59e0b; }
@@ -961,16 +964,16 @@
   gap: 6px;
   padding: 5px 10px;
   border-radius: 6px;
-  background: var(--eform-blue-light);
-  border: 1px solid var(--eform-blue-border);
+  background: var(--eform-red-light);
+  border: 1px solid var(--eform-red-border);
   font-size: 11px;
-  color: #1e40af;
+  color: #991b1b;
   font-weight: 500;
 }
 
 .form-usage-stage-icon {
   display: inline-flex;
-  color: var(--eform-blue);
+  color: var(--eform-red);
 }
 
 .form-usage-stage-name { font-weight: 600; }
@@ -993,16 +996,14 @@
 }
 
 /* ============================================================
-   FORMS LIST — Grid + Cards
+   FORMS LIST — Grid + Base Card
    ============================================================ */
-
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 16px;
 }
 
-/* ---------- BASE CARD ---------- */
 .form-card {
   display: flex;
   flex-direction: column;
@@ -1017,39 +1018,11 @@
   overflow: hidden;
 }
 
-/* ---------- LATEST VERSION — FULL BLUE BORDER ---------- */
-.form-card--latest {
-  border: 2px solid var(--eform-blue) !important;
-  background: var(--eform-blue-light);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
-}
-
-.form-card--latest:hover {
-  border-color: var(--eform-blue-dark) !important;
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.22);
-  transform: translateY(-2px);
-}
-
-/* ---------- OLD + IN USE — FULL RED BORDER ---------- */
-.form-card--old-but-used {
-  border: 2px solid var(--eform-red) !important;
-  background: var(--eform-red-light);
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
-}
-
-.form-card--old-but-used:hover {
-  border-color: var(--eform-red-dark) !important;
-  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.25);
-  transform: translateY(-2px);
-}
-
-/* ---------- DEFAULT HOVER (old unused / no class) ---------- */
-.form-card:hover:not(.form-card--latest):not(.form-card--old-but-used) {
+.form-card:hover:not(.form-card--latest):not(.form-card--has-warning) {
   border-color: #d1d5db;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
-/* Header */
 .form-card-header {
   display: flex;
   justify-content: space-between;
@@ -1077,7 +1050,6 @@
   color: #6b7280;
 }
 
-/* Status badge */
 .form-status {
   display: inline-flex;
   align-items: center;
@@ -1099,7 +1071,6 @@
 .form-status--published { background: #d1fae5; color: #065f46; }
 .form-status--archived { background: #f3f4f6; color: #4b5563; }
 
-/* Description */
 .form-card-description {
   font-size: 12px;
   color: #6b7280;
@@ -1110,38 +1081,9 @@
   overflow: hidden;
 }
 
-/* ============ ALERT BANNERS ============ */
-.form-card-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.form-card-alert svg {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.form-card-alert--danger {
-  background: var(--eform-red-soft);
-  color: #991b1b;
-  border: 1px solid #fca5a5;
-  border-left: 3px solid var(--eform-red);
-}
-
-.form-card-alert--muted {
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
-  border-left: 3px solid #9ca3af;
-}
-
-/* ============ USAGE INDICATOR ============ */
+/* ============================================================
+   USAGE INDICATOR — default (gray)
+   ============================================================ */
 .form-usage-indicator {
   display: flex;
   align-items: center;
@@ -1152,6 +1094,7 @@
   border: 1px solid #e5e7eb;
   font-size: 12px;
   color: #6b7280;
+  flex-wrap: wrap;
 }
 
 .form-usage-indicator--active {
@@ -1160,18 +1103,46 @@
   color: var(--eform-red-dark);
 }
 
-.form-usage-indicator--active svg {
-  color: var(--eform-red);
-}
-
+.form-usage-indicator--active svg { color: var(--eform-red); }
 .form-usage-indicator strong { font-weight: 600; }
+.form-usage-stage-count { color: #9ca3af; font-weight: 400; }
 
-.form-usage-stage-count {
-  color: #9ca3af;
-  font-weight: 400;
+.form-usage-version-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-/* ============ VERSION TAGS ============ */
+/* Latest + in-use → RED */
+.form-usage-indicator--latest-in-use {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.form-usage-indicator--latest-in-use svg {
+  color: #dc2626;
+}
+
+.form-usage-indicator--latest-in-use .form-usage-stage-count {
+  color: #991b1b;
+  opacity: 0.7;
+}
+
+.form-usage-indicator--latest-in-use .form-usage-version-badge {
+  background: #ffffff;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* ============================================================
+   VERSION TAGS
+   ============================================================ */
 .form-version-tag {
   display: inline-block;
   padding: 1px 6px;
@@ -1184,13 +1155,9 @@
 }
 
 .form-version-tag--latest {
-  background: var(--eform-blue-border);
-  color: #1e40af;
-}
-
-.form-version-tag--danger {
-  background: var(--eform-red-soft);
+  background: #fee2e2;
   color: #991b1b;
+  border: 1px solid #fca5a5;
 }
 
 .form-version-tag--old {
@@ -1198,7 +1165,9 @@
   color: #6b7280;
 }
 
-/* ============ HOVER TOOLTIP ============ */
+/* ============================================================
+   HOVER TOOLTIP
+   ============================================================ */
 .form-hover-tooltip {
   position: absolute;
   top: 100%;
@@ -1244,6 +1213,17 @@
   color: #111827;
 }
 
+.tooltip-workflow-version {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .tooltip-workflow-stages {
   display: block;
   color: #6b7280;
@@ -1251,7 +1231,9 @@
   margin-top: 2px;
 }
 
-/* Footer */
+/* ============================================================
+   FOOTER
+   ============================================================ */
 .form-card-footer {
   display: flex;
   justify-content: space-between;
@@ -1282,11 +1264,193 @@
   flex-wrap: wrap;
 }
 
-/* ============ STATS CARDS ============ */
-.wf-stat--latest { border-left-color: var(--eform-blue); }
-.wf-stat--old-used { border-left-color: var(--eform-red); }
-.wf-stat--used { border-left-color: var(--eform-blue); }
+/* ============================================================
+   STATS CARD ACCENTS
+   ============================================================ */
+.wf-stat--latest { border-left-color: var(--eform-red); }
+.wf-stat--old-used { border-left-color: var(--eform-yellow); }
+.wf-stat--used { border-left-color: var(--eform-red); }
 
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   🔴 LATEST FORM CARD — RED (default, no warning)
+   ============================================================ */
+.form-card--latest {
+  border: 2px solid #fca5a5 !important;
+  background: #fffafb !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.06) !important;
+  position: relative;
+}
+
+.form-card--latest:hover {
+  border-color: #dc2626 !important;
+  background: #fff5f5 !important;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.form-card--latest::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #dc2626;
+  border-radius: 12px 0 0 12px;
+}
+
+/* ============================================================
+   🟨 CARD WITH WARNING — YELLOW border (overrides red)
+   ============================================================ */
+.form-card--has-warning {
+  border: 2px solid #fcd34d !important;
+  background: #fffdf5 !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1) !important;
+  position: relative;
+}
+
+.form-card--has-warning:hover {
+  border-color: #f59e0b !important;
+  background: #fffbeb !important;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.18) !important;
+  transform: translateY(-2px);
+}
+
+.form-card--has-warning::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #f59e0b;
+  border-radius: 12px 0 0 12px;
+}
+
+/* ============================================================
+   🟨 WARNING BANNER — YELLOW (inside warning card)
+   ============================================================ */
+.form-outdated-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.form-outdated-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+}
+
+.form-outdated-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: #ffffff;
+}
+
+.form-outdated-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-outdated-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 2px;
+}
+
+.form-outdated-title strong {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.form-outdated-subtitle {
+  font-size: 11.5px;
+  color: #78350f;
+  line-height: 1.4;
+}
+
+.form-outdated-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.form-outdated-action {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #f59e0b;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.form-outdated-action:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.form-outdated-action:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.form-outdated-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   🔴 LATEST WORKFLOW ROW — RED (matches brand)
+   ============================================================ */
+.data-table tbody tr.wf-row--latest td {
+  background: #fef2f2;
+}
+
+.data-table tbody tr.wf-row--latest td:first-child {
+  border-left: 3px solid #dc2626;
+  padding-left: 15px;
+}
+
+.data-table tbody tr.wf-row--latest:hover td {
+  background: #fee2e2;
+}
+
+.wf-latest-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
 }

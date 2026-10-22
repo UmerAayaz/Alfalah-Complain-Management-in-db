@@ -68,15 +68,6 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
 
         db.ChangeTracker.Clear();
 
-        // STEP 1: Purane children delete
-        // await db.Database.ExecuteSqlInterpolatedAsync($@"
-        //     DELETE FROM WorkflowNodeFieldAttachmentConfigs
-        //     WHERE WorkflowNodeFieldId IN (
-        //         SELECT f.Id FROM WorkflowNodeFields f
-        //         INNER JOIN WorkflowNodes n ON n.Id = f.WorkflowNodeId
-        //         WHERE n.WorkflowDefinitionId = {id}
-        //     )", cancellationToken);
-
         await db.Database.ExecuteSqlInterpolatedAsync($@"
             DELETE FROM WorkflowNodeFields
             WHERE WorkflowNodeId IN (
@@ -91,30 +82,26 @@ public sealed class WorkflowDefinitionService(AppDbContext db, ICurrentUser curr
             DELETE FROM WorkflowNodes
             WHERE WorkflowDefinitionId = {id}", cancellationToken);
 
-        // STEP 2: Parent update
         var designerJson = JsonSerializer.Serialize(request);
         var now = DateTime.UtcNow;
 
-await db.Database.ExecuteSqlInterpolatedAsync($@"
-    UPDATE WorkflowDefinitions
-    SET Name = {request.Name.Trim()},
-        DepartmentId = {request.DepartmentId},
-        CategoryId = {request.CategoryId},
-        DesignerJson = {designerJson},
-        DefaultPriority = {request.DefaultPriority},
-        ProductId = {request.ProductId},
-        UpdatedAtUtc = {now}
-    WHERE Id = {id}", cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE WorkflowDefinitions
+            SET Name = {request.Name.Trim()},
+                DepartmentId = {request.DepartmentId},
+                CategoryId = {request.CategoryId},
+                DesignerJson = {designerJson},
+                DefaultPriority = {request.DefaultPriority},
+                ProductId = {request.ProductId},
+                UpdatedAtUtc = {now}
+            WHERE Id = {id}", cancellationToken);
 
-        // STEP 3: Fresh parent (tracked)
         db.ChangeTracker.Clear();
         var fresh = await db.WorkflowDefinitions
             .FirstAsync(x => x.Id == id, cancellationToken);
 
-        // STEP 4: BuildGraph — new nodes/transitions
         BuildGraph(fresh, request);
 
-        // STEP 5: EXPLICIT tracking — EF ko pakka batao
         foreach (var node in fresh.Nodes)
         {
             db.WorkflowNodes.Add(node);
@@ -122,9 +109,6 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
             foreach (var field in node.Fields)
             {
                 db.WorkflowNodeFields.Add(field);
-
-                // if (field.AttachmentConfig != null)
-                //     db.WorkflowNodeFieldAttachmentConfigs.Add(field.AttachmentConfig);
             }
         }
 
@@ -133,10 +117,8 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
             db.WorkflowTransitions.Add(transition);
         }
 
-        // STEP 6: Save
         await db.SaveChangesAsync(cancellationToken);
 
-        // STEP 7: DTO + clear tracker
         var dto = Map(fresh);
         db.ChangeTracker.Clear();
         return dto;
@@ -161,7 +143,6 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
         if (definition.Status != WorkflowDefinitionStatus.Draft)
             throw new InvalidOperationException("Only draft workflows can be published.");
 
-        // Validation
         var startCount = definition.Nodes.Count(x => x.Type == WorkflowNodeType.Start);
         if (startCount != 1)
             throw new InvalidOperationException(
@@ -234,7 +215,6 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
             throw new InvalidOperationException(
                 "Cannot publish: unreachable nodes — " + string.Join(", ", unreachable));
 
-        // Archive + Publish
         var oldPublished = await db.WorkflowDefinitions
             .Where(x => x.CategoryId == definition.CategoryId && x.Status == WorkflowDefinitionStatus.Published)
             .ToListAsync(cancellationToken);
@@ -291,6 +271,111 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
         return items.Select(Map).ToList();
     }
 
+    // ============================================================
+    // MIGRATE FORM — replace old form version with new in all workflows
+    // ============================================================
+    // ============================================================
+// MIGRATE FORM — replace old form version with new in all workflows
+// ============================================================
+public async Task<MigrateFormResult> MigrateFormAsync(
+    MigrateFormRequest request,
+    CancellationToken cancellationToken = default)
+{
+    // 1. Validate forms
+    var oldForm = await db.Forms.AsNoTracking()
+        .FirstOrDefaultAsync(f => f.Id == request.OldFormId, cancellationToken)
+        ?? throw new KeyNotFoundException("Source form not found.");
+
+    var newForm = await db.Forms.AsNoTracking()
+        .FirstOrDefaultAsync(f => f.Id == request.NewFormId, cancellationToken)
+        ?? throw new KeyNotFoundException("Target form not found.");
+
+    if (oldForm.FormKey != newForm.FormKey)
+        throw new ArgumentException("Both forms must share the same FormKey.");
+
+    if (newForm.Version <= oldForm.Version)
+        throw new ArgumentException("Target form must be a newer version than the source form.");
+
+    if (newForm.Status != "Published")
+        throw new ArgumentException("Target form must be Published.");
+
+    // 2. Load all non-archived workflows
+    var workflows = await db.WorkflowDefinitions
+        .AsNoTracking()
+        .Where(w => w.Status != WorkflowDefinitionStatus.Archived)
+        .ToListAsync(cancellationToken);
+
+    var updatedNames = new List<string>();
+    var skipped = new List<string>();
+    var warnings = new List<string>();
+
+    // 3. Process each workflow
+    foreach (var wf in workflows)
+    {
+        if (string.IsNullOrWhiteSpace(wf.DesignerJson)) continue;
+
+        CreateWorkflowDefinitionRequest? parsed;
+        try
+        {
+            parsed = JsonSerializer.Deserialize<CreateWorkflowDefinitionRequest>(wf.DesignerJson);
+        }
+        catch
+        {
+            warnings.Add($"\"{wf.Name}\" — invalid designer JSON, skipped.");
+            continue;
+        }
+
+        if (parsed is null)
+        {
+            warnings.Add($"\"{wf.Name}\" — empty designer JSON, skipped.");
+            continue;
+        }
+
+        var usesOldForm = parsed.Nodes.Any(n =>
+            n.FormId.HasValue && n.FormId.Value == request.OldFormId);
+
+        if (!usesOldForm) continue;
+
+        var updatedNodes = parsed.Nodes.Select(n =>
+            n.FormId.HasValue && n.FormId.Value == request.OldFormId
+                ? n with { FormId = request.NewFormId }
+                : n
+        ).ToList();
+
+        var updatedRequest = parsed with { Nodes = updatedNodes };
+
+        try
+        {
+            if (wf.Status == WorkflowDefinitionStatus.Draft)
+            {
+                await UpdateDraftAsync(wf.Id, updatedRequest, cancellationToken);
+                updatedNames.Add($"{wf.Name} (Draft — updated in place)");
+            }
+            else if (wf.Status == WorkflowDefinitionStatus.Published)
+            {
+                var newWf = await CreateAsync(updatedRequest, cancellationToken);
+                await PublishAsync(newWf.Id, cancellationToken);
+                updatedNames.Add($"{wf.Name} → v{newWf.Version} (auto-published)");
+                warnings.Add($"\"{wf.Name}\" — new v{newWf.Version} created and auto-published. Please review.");
+            }
+            else
+            {
+                skipped.Add($"{wf.Name} (Archived)");
+            }
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"\"{wf.Name}\" — migration failed: {ex.Message}");
+        }
+    }
+
+    return new MigrateFormResult(updatedNames.Count, updatedNames, skipped, warnings);
+}
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+
     private async Task EnsureDepartmentAdminAsync(Guid departmentId, CancellationToken cancellationToken)
     {
         var allowed = await db.DepartmentMemberships
@@ -330,30 +415,30 @@ await db.Database.ExecuteSqlInterpolatedAsync($@"
                 PositionY = item.Y,
                 ConfigJson = item.ConfigJson
             };
-if (item.Type == WorkflowNodeType.HumanTask &&
-    item.Fields is not null)
-{
-    foreach (var field in item.Fields.OrderBy(x => x.DisplayOrder))
-    {
-        var fieldType = field.FieldType.Trim().ToLowerInvariant();
+            if (item.Type == WorkflowNodeType.HumanTask &&
+                item.Fields is not null)
+            {
+                foreach (var field in item.Fields.OrderBy(x => x.DisplayOrder))
+                {
+                    var fieldType = field.FieldType.Trim().ToLowerInvariant();
 
-        var nodeField = new WorkflowNodeField
-        {
-            WorkflowNodeId = node.Id,
-            FieldKey = field.FieldKey.Trim(),
-            Label = field.Label.Trim(),
-            FieldType = fieldType,
-            Placeholder = field.Placeholder?.Trim(),
-            IsRequired = field.IsRequired,
-            DisplayOrder = field.DisplayOrder,
-            OptionsJson = field.Options is null
-                ? null
-                : JsonSerializer.Serialize(field.Options),
-        };
+                    var nodeField = new WorkflowNodeField
+                    {
+                        WorkflowNodeId = node.Id,
+                        FieldKey = field.FieldKey.Trim(),
+                        Label = field.Label.Trim(),
+                        FieldType = fieldType,
+                        Placeholder = field.Placeholder?.Trim(),
+                        IsRequired = field.IsRequired,
+                        DisplayOrder = field.DisplayOrder,
+                        OptionsJson = field.Options is null
+                            ? null
+                            : JsonSerializer.Serialize(field.Options),
+                    };
 
-        node.Fields.Add(nodeField);
-    }
-}
+                    node.Fields.Add(nodeField);
+                }
+            }
             definition.Nodes.Add(node);
             byKey[node.NodeKey] = node;
         }
@@ -447,4 +532,5 @@ if (item.Type == WorkflowNodeType.HumanTask &&
         if (unreachable.Count > 0)
             throw new ArgumentException("Unreachable nodes: " + string.Join(", ", unreachable));
     }
+
 }

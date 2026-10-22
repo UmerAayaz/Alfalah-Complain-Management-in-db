@@ -42,4 +42,9 @@ public interface IWorkflowDefinitionService
     Task<WorkflowDefinitionDto> CreateNewVersionAsync(Guid id, CancellationToken cancellationToken);
     Task<WorkflowDefinitionDto?> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkflowDefinitionDto>> ListAsync(Guid? categoryId, CancellationToken cancellationToken);
+
+    // ✅ YEH 2 LINES ADD KARO:
+    Task<MigrateFormResult> MigrateFormAsync(
+        MigrateFormRequest request,
+        CancellationToken cancellationToken = default);
 }

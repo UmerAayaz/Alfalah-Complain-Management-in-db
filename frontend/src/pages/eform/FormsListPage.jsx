@@ -3,6 +3,8 @@ import { api } from '../../api/client.js'
 import PageHeader from '../../components/PageHeader.jsx'
 import ErrorBanner from '../../components/ErrorBanner.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
+import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import { useToast, ToastContainer } from '../../components/Toast.jsx'
 import './eform.css'
 
 // ============================================================
@@ -31,13 +33,17 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString()
 }
 
-function parseWorkflowUsage(workflows, formId) {
+function parseWorkflowUsage(workflows, formId, formsById = {}) {
   const result = { workflows: [], totalStages: 0 }
   if (!formId) return result
 
   const targetFormId = formId.toLowerCase()
+  const formVersion = formsById[targetFormId]?.version
 
   workflows.forEach((w) => {
+    // Skip archived workflows
+    if (w.status === 2 || w.status === 'Archived') return
+
     try {
       const designer = JSON.parse(w.designerJson || '{}')
       const nodes = designer.Nodes || designer.nodes || []
@@ -52,15 +58,22 @@ function parseWorkflowUsage(workflows, formId) {
           workflowName: w.name,
           workflowStatus: w.status,
           workflowVersion: w.version,
+          formVersion,
           stageNames: matching.map((n) => n.Name || n.name || 'Untitled'),
         })
       }
     } catch {
-      // ignore
+      // ignore malformed designer json
     }
   })
 
   return result
+}
+
+function getWorkflowStatusLabel(status) {
+  if (status === 1) return { label: 'Published', key: 'published' }
+  if (status === 0) return { label: 'Draft', key: 'draft' }
+  return { label: 'Archived', key: 'archived' }
 }
 
 // ============================================================
@@ -72,10 +85,16 @@ export default function FormsListPage({ navigate }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [updatingFormId, setUpdatingFormId] = useState('')
   const [hoveredFormId, setHoveredFormId] = useState(null)
-
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+
+  // ✅ Confirm dialog state
+  const [confirmState, setConfirmState] = useState(null)
+
+  // ✅ Toast hook
+  const { toasts, showToast, removeToast } = useToast()
 
   // ============================================================
   // LOAD
@@ -84,7 +103,7 @@ export default function FormsListPage({ navigate }) {
     setLoading(true)
     try {
       const [formsData, wfs] = await Promise.all([
-        api('/forms'),
+        api('/forms?includeAllVersions=true'),
         api('/workflow-definitions').catch(() => []),
       ])
       setForms(Array.isArray(formsData) ? formsData : [])
@@ -103,19 +122,22 @@ export default function FormsListPage({ navigate }) {
   }, [])
 
   // ============================================================
-  // FORM USAGE MAP
+  // MEMOS
   // ============================================================
+  const formsById = useMemo(() => {
+    const map = {}
+    forms.forEach((f) => { map[f.id.toLowerCase()] = f })
+    return map
+  }, [forms])
+
   const usageMap = useMemo(() => {
     const map = {}
     forms.forEach((f) => {
-      map[f.id.toLowerCase()] = parseWorkflowUsage(workflows, f.id)
+      map[f.id.toLowerCase()] = parseWorkflowUsage(workflows, f.id, formsById)
     })
     return map
-  }, [forms, workflows])
+  }, [forms, workflows, formsById])
 
-  // ============================================================
-  // VERSION GROUPING — kaunsa latest hai per FormKey
-  // ============================================================
   const latestByKey = useMemo(() => {
     const map = {}
     forms.forEach((f) => {
@@ -127,102 +149,208 @@ export default function FormsListPage({ navigate }) {
     return map
   }, [forms])
 
-  // ============================================================
-  // FILTER
-  // ============================================================
-const filtered = useMemo(() => {
-  return forms.filter((f) => {
-    // Filter old-unused forms (hide them completely)
-    const key = f.formKey || f.id
-    const latest = latestByKey[key]
-    const isLatest = latest?.id === f.id
-    const usage = usageMap[f.id.toLowerCase()] || { workflows: [] }
-    const inUse = usage.workflows.length > 0
+  const filtered = useMemo(() => {
+    return forms.filter((f) => {
+      const key = f.formKey || f.id
+      if (latestByKey[key]?.id !== f.id) return false
+      if (search && !f.name?.toLowerCase().includes(search.toLowerCase()))
+        return false
+      if (filterStatus && f.status !== filterStatus) return false
+      return true
+    })
+  }, [forms, search, filterStatus, latestByKey])
 
-    // Old + unused → hide
-    if (!isLatest && !inUse) return false
-
-    if (search && !f.name?.toLowerCase().includes(search.toLowerCase()))
-      return false
-    if (filterStatus && f.status !== filterStatus) return false
-    return true
-  })
-}, [forms, search, filterStatus, latestByKey, usageMap])
-
-  // ============================================================
-  // STATS
-  // ============================================================
   const stats = useMemo(() => {
-  let latestCount = 0
-  let oldButUsedCount = 0
-  let visibleTotal = 0
-
-  forms.forEach((f) => {
-    const key = f.formKey || f.id
-    const isLatest = latestByKey[key]?.id === f.id
-    const usage = usageMap[f.id.toLowerCase()] || { workflows: [] }
-    const inUse = usage.workflows.length > 0
-
-    if (isLatest) {
-      latestCount++
-      visibleTotal++
-    } else if (inUse) {
-      oldButUsedCount++
-      visibleTotal++
-    }
-    // old-unused → not counted
-  })
-
-  return {
-    total: visibleTotal,
-    latestCount,
-    oldButUsedCount,
-  }
-}, [forms, usageMap, latestByKey])
+    let total = 0
+    let published = 0
+    let needsAttention = 0
+    filtered.forEach((f) => {
+      total++
+      if (f.status === 'Published') published++
+      const hasOldInUse = forms.some(
+        (old) =>
+          old.formKey === f.formKey &&
+          old.id !== f.id &&
+          (usageMap[old.id.toLowerCase()]?.workflows.length || 0) > 0
+      )
+      if (hasOldInUse) needsAttention++
+    })
+    return { total, published, needsAttention }
+  }, [filtered, forms, usageMap])
 
   // ============================================================
-  // ACTIONS
+  // ACTIONS — Publish (with confirm + toast)
   // ============================================================
-  const publishForm = async (form) => {
-    if (
-      !window.confirm(
-        `Publish "${form.name}"? It will become available in the workflow designer.`
-      )
-    )
-      return
-
-    setBusyId(form.id)
-    try {
-      await api(`/forms/${form.id}/publish`, { method: 'POST' })
-      window.alert('Form published successfully!')
-      await load()
-    } catch (err) {
-      alert(`Publish failed: ${err.message}`)
-    } finally {
-      setBusyId('')
-    }
+  const publishForm = (form) => {
+    setConfirmState({
+      title: `Publish "${form.name}"?`,
+      variant: 'primary',
+      confirmLabel: 'Publish',
+      content: (
+        <p style={{ margin: 0 }}>
+          This will make <strong>{form.name}</strong> available in the workflow
+          designer. You can still create new versions later.
+        </p>
+      ),
+      onConfirm: async () => {
+        setConfirmState(null)
+        setBusyId(form.id)
+        try {
+          await api(`/forms/${form.id}/publish`, { method: 'POST' })
+          showToast(`"${form.name}" published successfully`, 'success')
+          await load()
+        } catch (err) {
+          showToast(`Publish failed: ${err.message}`, 'error')
+        } finally {
+          setBusyId('')
+        }
+      },
+    })
   }
 
-  const createNewVersion = async (form) => {
-    if (
-      !window.confirm(
-        `Create a new version of "${form.name}"? A new Draft version will be created.`
-      )
-    )
-      return
+  // ============================================================
+  // ACTIONS — Create new version (with confirm + toast)
+  // ============================================================
+  const createNewVersion = (form) => {
+    setConfirmState({
+      title: 'Create new version?',
+      variant: 'primary',
+      confirmLabel: 'Create version',
+      content: (
+        <p style={{ margin: 0 }}>
+          A new <strong>Draft</strong> version of <strong>{form.name}</strong>{' '}
+          will be created. You can edit it freely — workflows will continue
+          using the current published version until you publish the new one.
+        </p>
+      ),
+      onConfirm: async () => {
+        setConfirmState(null)
+        setBusyId(form.id)
+        try {
+          const created = await api(`/forms/${form.id}/new-version`, {
+            method: 'POST',
+          })
+          showToast(`New version v${created.version} created`, 'success')
+          navigate(`/forms/${created.id}`)
+        } catch (err) {
+          showToast(`Create version failed: ${err.message}`, 'error')
+        } finally {
+          setBusyId('')
+        }
+      },
+    })
+  }
 
-    setBusyId(form.id)
-    try {
-      const created = await api(`/forms/${form.id}/new-version`, {
-        method: 'POST',
-      })
-      window.alert(`New version v${created.version} created!`)
-      navigate(`/forms/${created.id}`)
-    } catch (err) {
-      alert(`Create version failed: ${err.message}`)
-    } finally {
-      setBusyId('')
-    }
+  // ============================================================
+  // ACTIONS — Migrate form to latest (with modal + toasts)
+  // ============================================================
+  const migrateFormToLatest = (latestForm, oldForm, workflowUsages) => {
+    if (!oldForm || !workflowUsages || workflowUsages.length === 0) return
+
+    const wfCount = workflowUsages.length
+
+    setConfirmState({
+      title: 'Update to latest version?',
+      variant: 'primary',
+      confirmLabel: `Update to v${latestForm.version}`,
+      content: (
+        <>
+          <div className="migrate-version-row">
+            <span className="migrate-version-from">v{oldForm.version}</span>
+            <span className="migrate-version-arrow">→</span>
+            <span className="migrate-version-to">v{latestForm.version}</span>
+          </div>
+
+          <div className="migrate-section">
+            <div className="migrate-section-label">
+              Workflows to migrate ({wfCount})
+            </div>
+            <div className="migrate-workflow-list">
+              {workflowUsages.map((w) => {
+                const st = getWorkflowStatusLabel(w.workflowStatus)
+                return (
+                  <div key={w.workflowId} className="migrate-workflow-item">
+                    <span>
+                      <strong>{w.workflowName}</strong> · v{w.workflowVersion}
+                    </span>
+                    <span
+                      className={`migrate-workflow-badge migrate-workflow-badge--${st.key}`}
+                    >
+                      {st.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="migrate-section">
+            <div className="migrate-section-label">What will happen</div>
+            <div className="migrate-impact-list">
+              <div className="migrate-impact-item">
+                A new version of each workflow will be created
+              </div>
+              <div className="migrate-impact-item">
+                All existing nodes and stages stay exactly the same
+              </div>
+              <div className="migrate-impact-item">
+                Only the form reference changes to v{latestForm.version}
+              </div>
+              <div className="migrate-impact-item">
+                The new workflow version will be published automatically
+              </div>
+              <div className="migrate-impact-item">
+                The old published version will be archived
+              </div>
+            </div>
+          </div>
+        </>
+      ),
+      onConfirm: async () => {
+        setConfirmState(null)
+        setUpdatingFormId(latestForm.id)
+        try {
+          const result = await api('/workflow-definitions/migrate-form', {
+            method: 'POST',
+            body: { oldFormId: oldForm.id, newFormId: latestForm.id },
+          })
+
+          // Success toast
+          if (result.updatedCount > 0) {
+            showToast(
+              `${result.updatedCount} workflow${result.updatedCount !== 1 ? 's' : ''
+              } updated to use v${latestForm.version}`,
+              'success',
+              5500
+            )
+          } else {
+            showToast('No workflows were updated', 'info')
+          }
+
+          // Warnings
+          if (result.warnings?.length > 0) {
+            result.warnings.forEach((w) =>
+              showToast(w, 'warning', 6500)
+            )
+          }
+
+          // Skipped
+          if (result.skipped?.length > 0) {
+            showToast(
+              `${result.skipped.length} workflow${result.skipped.length !== 1 ? 's' : ''
+              } skipped (archived)`,
+              'info'
+            )
+          }
+
+          await load()
+        } catch (err) {
+          showToast(`Update failed: ${err.message}`, 'error', 6500)
+        } finally {
+          setUpdatingFormId('')
+        }
+      },
+    })
   }
 
   // ============================================================
@@ -256,19 +384,19 @@ const filtered = useMemo(() => {
 
       {/* STATS */}
       <div className="wf-stats">
-  <div className="wf-stat">
-    <span className="wf-stat-label">Total Visible</span>
-    <strong className="wf-stat-value">{stats.total}</strong>
-  </div>
-  <div className="wf-stat wf-stat--latest">
-    <span className="wf-stat-label">Latest</span>
-    <strong className="wf-stat-value">{stats.latestCount}</strong>
-  </div>
-  <div className="wf-stat wf-stat--old-used">
-    <span className="wf-stat-label">Old · In Use</span>
-    <strong className="wf-stat-value">{stats.oldButUsedCount}</strong>
-  </div>
-</div>
+        <div className="wf-stat">
+          <span className="wf-stat-label">Total Forms</span>
+          <strong className="wf-stat-value">{stats.total}</strong>
+        </div>
+        <div className="wf-stat wf-stat--latest">
+          <span className="wf-stat-label">Published</span>
+          <strong className="wf-stat-value">{stats.published}</strong>
+        </div>
+        <div className="wf-stat wf-stat--old-used">
+          <span className="wf-stat-label">Needs Attention</span>
+          <strong className="wf-stat-value">{stats.needsAttention}</strong>
+        </div>
+      </div>
 
       {/* FILTERS */}
       <div className="wf-filters">
@@ -323,23 +451,37 @@ const filtered = useMemo(() => {
         <div className="form-grid">
           {filtered.map((form) => {
             const statusMeta = getStatusMeta(form.status)
-            const usage = usageMap[form.id.toLowerCase()] || {
+            const formUsage = usageMap[form.id.toLowerCase()] || {
               workflows: [],
               totalStages: 0,
             }
-            const inUse = usage.workflows.length > 0
-            const latestForKey = latestByKey[form.formKey || form.id]
-            const isLatest = latestForKey?.id === form.id
-            const isOldVersion = !isLatest
+            const formIsInUse = formUsage.workflows.length > 0
+
+            const oldVersionsInUse = forms
+              .filter(
+                (old) =>
+                  old.formKey === form.formKey &&
+                  old.id !== form.id &&
+                  (usageMap[old.id.toLowerCase()]?.workflows.length || 0) > 0
+              )
+              .sort((a, b) => (b.version || 0) - (a.version || 0))
+
+            const mostRecentOld = oldVersionsInUse[0] || null
+            const mostRecentOldUsage = mostRecentOld
+              ? usageMap[mostRecentOld.id.toLowerCase()]
+              : null
+            const hasOldInUse = oldVersionsInUse.length > 0
+
             const isBusy = busyId === form.id
+            const isUpdating = updatingFormId === form.id
             const isHovered = hoveredFormId === form.id
 
             return (
               <article
                 key={form.id}
-                className={`form-card form-card--${statusMeta.key} ${
-                  inUse ? 'form-card--in-use' : ''
-                } ${isOldVersion ? 'form-card--old-version' : ''}`}
+                className={`form-card form-card--${statusMeta.key} ${formIsInUse ? 'form-card--in-use' : ''
+                  } form-card--latest ${hasOldInUse ? 'form-card--has-warning' : ''
+                  }`}
                 onClick={() => navigate(`/forms/${form.id}`)}
                 onMouseEnter={() => setHoveredFormId(form.id)}
                 onMouseLeave={() => setHoveredFormId(null)}
@@ -350,18 +492,12 @@ const filtered = useMemo(() => {
                     <div className="form-card-name">{form.name}</div>
                     <div className="form-card-meta">
                       v{form.version}
-                      {isLatest && form.formKey && (
+                      {form.formKey && (
                         <span className="form-version-tag form-version-tag--latest">
                           Latest
                         </span>
                       )}
-                      {isOldVersion && (
-                        <span className="form-version-tag form-version-tag--old">
-                          Superseded
-                        </span>
-                      )}
-                      {form.fields?.length > 0 &&
-                        ` · ${form.fields.length} fields`}
+                      {form.fieldCount > 0 && ` · ${form.fieldCount} fields`}
                     </div>
                   </div>
                   <span
@@ -379,13 +515,64 @@ const filtered = useMemo(() => {
                   </div>
                 )}
 
+                {/* WARNING */}
+                {hasOldInUse && mostRecentOldUsage && (
+                  <div className="form-outdated-banner">
+                    <div className="form-outdated-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 9v4" />
+                        <path d="M12 17h.01" />
+                      </svg>
+                    </div>
+                    <div className="form-outdated-content">
+                      <div className="form-outdated-title">
+                        Old version <strong>v{mostRecentOld.version}</strong>{' '}
+                        is still used in {mostRecentOldUsage.workflows.length}{' '}
+                        workflow
+                        {mostRecentOldUsage.workflows.length !== 1 ? 's' : ''}
+                      </div>
+                      <div className="form-outdated-subtitle">
+                        Update to <strong>v{form.version}</strong>. A new
+                        workflow version will be created with only the form
+                        reference changed, then published automatically.
+                      </div>
+                    </div>
+                    <div className="form-outdated-actions">
+                      <button
+                        type="button"
+                        className="form-outdated-action"
+                        disabled={isUpdating}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          migrateFormToLatest(
+                            form,
+                            mostRecentOld,
+                            mostRecentOldUsage.workflows
+                          )
+                        }}
+                      >
+                        {isUpdating
+                          ? 'Updating…'
+                          : `Update to v${form.version} →`}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* USAGE INDICATOR */}
                 <div
-                  className={`form-usage-indicator ${
-                    inUse ? 'form-usage-indicator--active' : ''
-                  }`}
+                  className={`form-usage-indicator ${formIsInUse ? 'form-usage-indicator--active' : ''
+                    } ${formIsInUse ? 'form-usage-indicator--latest-in-use' : ''
+                    }`}
                 >
-                  {inUse ? (
+                  {formIsInUse ? (
                     <>
                       <svg
                         width="14"
@@ -401,12 +588,15 @@ const filtered = useMemo(() => {
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                       </svg>
                       <strong>
-                        Used in {usage.workflows.length} workflow
-                        {usage.workflows.length !== 1 ? 's' : ''}
+                        Used in {formUsage.workflows.length} workflow
+                        {formUsage.workflows.length !== 1 ? 's' : ''}
                       </strong>
                       <span className="form-usage-stage-count">
-                        · {usage.totalStages} stage
-                        {usage.totalStages !== 1 ? 's' : ''}
+                        · {formUsage.totalStages} stage
+                        {formUsage.totalStages !== 1 ? 's' : ''}
+                      </span>
+                      <span className="form-usage-version-badge">
+                        pinned at v{form.version}
                       </span>
                     </>
                   ) : (
@@ -425,21 +615,30 @@ const filtered = useMemo(() => {
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span>Not used in any workflow</span>
+                      <span>
+                        {hasOldInUse
+                          ? 'Not used directly — old versions in workflows above'
+                          : 'Not used in any workflow'}
+                      </span>
                     </>
                   )}
                 </div>
 
-                {/* HOVER TOOLTIP — WORKFLOWS */}
-                {isHovered && inUse && (
+                {/* TOOLTIP */}
+                {isHovered && formIsInUse && (
                   <div className="form-hover-tooltip">
                     <strong>Used in:</strong>
                     <ul>
-                      {usage.workflows.slice(0, 5).map((w) => (
+                      {formUsage.workflows.slice(0, 5).map((w) => (
                         <li key={w.workflowId}>
                           <span className="tooltip-workflow-name">
                             {w.workflowName}
                           </span>
+                          {w.formVersion && (
+                            <span className="tooltip-workflow-version">
+                              v{w.formVersion}
+                            </span>
+                          )}
                           <span className="tooltip-workflow-stages">
                             {w.stageNames.join(', ')}
                           </span>
@@ -489,16 +688,17 @@ const filtered = useMemo(() => {
                       </>
                     )}
 
-                    {form.status === 'Published' && isLatest && (
+                    {form.status === 'Published' && (
                       <button
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-secondary btn-sm"
                         disabled={isBusy}
                         onClick={(e) => {
                           e.stopPropagation()
                           createNewVersion(form)
                         }}
+                        title="Published forms are immutable — a new Draft version will be created so you can edit it"
                       >
-                        {isBusy ? 'Creating…' : '+ New Version'}
+                        {isBusy ? 'Preparing…' : 'Edit'}
                       </button>
                     )}
                   </div>
@@ -508,6 +708,21 @@ const filtered = useMemo(() => {
           })}
         </div>
       )}
+
+      {/* ✅ Confirm Dialog */}
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        variant={confirmState?.variant}
+        confirmLabel={confirmState?.confirmLabel}
+        onConfirm={confirmState?.onConfirm}
+        onCancel={() => setConfirmState(null)}
+      >
+        {confirmState?.content}
+      </ConfirmDialog>
+
+      {/* ✅ Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </>
   )
 }
